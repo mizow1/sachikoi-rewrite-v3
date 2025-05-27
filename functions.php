@@ -348,10 +348,10 @@ function getFilteredUrls($sheetData, $keyword = '', $sortBy = 'impressions_desc'
     usort($filteredUrls, function($a, $b) use ($sortBy) {
         $urlA = $a[0];
         $urlB = $b[0];
-        $impressionsA = isset($a[1]) ? (int)$a[1] : 0;
-        $impressionsB = isset($b[1]) ? (int)$b[1] : 0;
-        $clicksA = isset($a[2]) ? (int)$a[2] : 0;
-        $clicksB = isset($b[2]) ? (int)$b[2] : 0;
+        $clicksA = isset($a[1]) ? (int)$a[1] : 0;
+        $clicksB = isset($b[1]) ? (int)$b[1] : 0;
+        $impressionsA = isset($a[2]) ? (int)$a[2] : 0;
+        $impressionsB = isset($b[2]) ? (int)$b[2] : 0;
         $positionA = isset($a[4]) ? (float)$a[4] : 0;
         $positionB = isset($b[4]) ? (float)$b[4] : 0;
         $rewriteCountA = isset($a[count($a)-1]) ? (int)$a[count($a)-1] : 0;

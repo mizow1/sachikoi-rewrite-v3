@@ -129,8 +129,8 @@ $pageTitle = "記事リライトツール";
                             <?php foreach ($filteredUrls as $index => $row): ?>
                                 <?php 
                                     $url = $row[0]; 
-                                    $impressions = isset($row[1]) ? $row[1] : 0;
-                                    $clicks = isset($row[2]) ? $row[2] : 0;
+                                    $clicks = isset($row[1]) ? $row[1] : 0;
+                                    $impressions = isset($row[2]) ? $row[2] : 0;
                                     $ctr = isset($row[3]) ? $row[3] : '0%';
                                     $position = isset($row[4]) ? $row[4] : 0;
                                     $rewriteCount = isset($rewriteCounts[$url]) ? $rewriteCounts[$url] : 0;

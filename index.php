@@ -20,8 +20,12 @@ $debugInfo['データ取得結果'] = [
     'シートデータ取得' => !empty($sheetData) ? '成功 (' . count($sheetData) . '行)' : '失敗'
 ];
 
+// キーワードとソート条件を取得
+$keyword = isset($_GET['keyword']) ? $_GET['keyword'] : '';
+$sortBy = isset($_GET['sort']) ? $_GET['sort'] : 'impressions_desc';
+
 // フィルタリングされたURLリストを取得
-$filteredUrls = getFilteredUrls($sheetData);
+$filteredUrls = getFilteredUrls($sheetData, $keyword, $sortBy);
 $debugInfo['データ取得結果']['フィルタリング後'] = !empty($filteredUrls) ? '成功 (' . count($filteredUrls) . '行)' : '失敗';
 
 // リライト回数を計算
@@ -84,13 +88,26 @@ $pageTitle = "記事リライトツール";
                 <div class="control-panel">
                     <button type="submit" class="btn btn-primary">選択した記事をリライト</button>
                     <div class="filter-controls">
-                        <label for="sortBy">並び替え:</label>
-                        <select id="sortBy" name="sortBy">
-                            <option value="impressions_asc">表示回数（少ない順）</option>
-                            <option value="impressions_desc">表示回数（多い順）</option>
-                            <option value="rewrite_count_asc">リライト回数（少ない順）</option>
-                            <option value="rewrite_count_desc">リライト回数（多い順）</option>
-                        </select>
+                        <div class="filter-item">
+                            <label for="keyword">キーワード検索:</label>
+                            <input type="text" id="keyword" name="keyword" value="<?php echo htmlspecialchars($keyword); ?>" placeholder="URLで検索">
+                            <button type="button" id="searchBtn" class="btn btn-small">検索</button>
+                        </div>
+                        <div class="filter-item">
+                            <label for="sortBy">並び替え:</label>
+                            <select id="sortBy" name="sortBy">
+                                <option value="impressions_asc" <?php echo $sortBy === 'impressions_asc' ? 'selected' : ''; ?>>表示回数（少ない順）</option>
+                                <option value="impressions_desc" <?php echo $sortBy === 'impressions_desc' ? 'selected' : ''; ?>>表示回数（多い順）</option>
+                                <option value="clicks_asc" <?php echo $sortBy === 'clicks_asc' ? 'selected' : ''; ?>>クリック数（少ない順）</option>
+                                <option value="clicks_desc" <?php echo $sortBy === 'clicks_desc' ? 'selected' : ''; ?>>クリック数（多い順）</option>
+                                <option value="position_asc" <?php echo $sortBy === 'position_asc' ? 'selected' : ''; ?>>平均掲載順位（上位順）</option>
+                                <option value="position_desc" <?php echo $sortBy === 'position_desc' ? 'selected' : ''; ?>>平均掲載順位（下位順）</option>
+                                <option value="rewrite_count_asc" <?php echo $sortBy === 'rewrite_count_asc' ? 'selected' : ''; ?>>リライト回数（少ない順）</option>
+                                <option value="rewrite_count_desc" <?php echo $sortBy === 'rewrite_count_desc' ? 'selected' : ''; ?>>リライト回数（多い順）</option>
+                                <option value="url_asc" <?php echo $sortBy === 'url_asc' ? 'selected' : ''; ?>>URL（昇順）</option>
+                                <option value="url_desc" <?php echo $sortBy === 'url_desc' ? 'selected' : ''; ?>>URL（降順）</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 

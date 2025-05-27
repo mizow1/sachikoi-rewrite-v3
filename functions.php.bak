@@ -289,7 +289,74 @@ function writeToSheet($range, $values) {
     return ($httpCode >= 200 && $httpCode < 300);
 }
 
-
+/**
+ * フィルタリングとソートされたURLリストを取得する関数
+ * 
+ * @param array $sheetData スプレッドシートのデータ
+ * @param string $keyword 検索キーワード（オプション）
+ * @param string $sortBy ソート条件（オプション）
+ * @return array フィルタリングとソートされたURLリスト
+ */
+function getFilteredUrls($sheetData, $keyword = '', $sortBy = 'impressions_desc') {
+    // リライト回数を計算
+    $rewriteCounts = calculateRewriteCounts($sheetData);
+    
+    // キーワードでフィルタリング
+    $filteredUrls = [];
+    foreach ($sheetData as $row) {
+        $url = $row[0];
+        
+        // キーワードが指定されている場合、URLに含まれているかチェック
+        if (!empty($keyword) && stripos($url, $keyword) === false) {
+            continue;
+        }
+        
+        // リライト回数を追加
+        $row[] = isset($rewriteCounts[$url]) ? $rewriteCounts[$url] : 0;
+        $filteredUrls[] = $row;
+    }
+    
+    // ソート処理
+    usort($filteredUrls, function($a, $b) use ($sortBy) {
+        $urlA = $a[0];
+        $urlB = $b[0];
+        $impressionsA = isset($a[1]) ? (int)$a[1] : 0;
+        $impressionsB = isset($b[1]) ? (int)$b[1] : 0;
+        $clicksA = isset($a[2]) ? (int)$a[2] : 0;
+        $clicksB = isset($b[2]) ? (int)$b[2] : 0;
+        $positionA = isset($a[4]) ? (float)$a[4] : 0;
+        $positionB = isset($b[4]) ? (float)$b[4] : 0;
+        $rewriteCountA = isset($a[count($a)-1]) ? (int)$a[count($a)-1] : 0;
+        $rewriteCountB = isset($b[count($b)-1]) ? (int)$b[count($b)-1] : 0;
+        
+        switch ($sortBy) {
+            case 'impressions_asc':
+                return $impressionsA - $impressionsB;
+            case 'impressions_desc':
+                return $impressionsB - $impressionsA;
+            case 'clicks_asc':
+                return $clicksA - $clicksB;
+            case 'clicks_desc':
+                return $clicksB - $clicksA;
+            case 'position_asc':
+                return $positionA - $positionB;
+            case 'position_desc':
+                return $positionB - $positionA;
+            case 'rewrite_count_asc':
+                return $rewriteCountA - $rewriteCountB;
+            case 'rewrite_count_desc':
+                return $rewriteCountB - $rewriteCountA;
+            case 'url_asc':
+                return strcmp($urlA, $urlB);
+            case 'url_desc':
+                return strcmp($urlB, $urlA);
+            default:
+                return $impressionsB - $impressionsA; // デフォルトは表示回数の多い順
+        }
+    });
+    
+    return $filteredUrls;
+}
 
 /**
  * リライト回数を計算する関数
@@ -395,23 +462,11 @@ function getFilteredUrls($sheetData, $keyword = '', $sortBy = 'impressions_desc'
  * @return string 問題点の分析結果
  */
 function analyzeArticleIssues($title, $description, $content) {
-    // 処理時間の制限を設定（最大実行時間を300秒に設定）
-    set_time_limit(300);
-    
-    // メモリ制限を緩和
-    ini_set('memory_limit', '512M');
-    
     $apiKey = OPENAI_API_KEY;
     $model = OPENAI_MODEL;
     
     // HTMLタグを除去してプレーンテキストに変換
     $plainContent = strip_tags($content);
-    
-    // コンテンツが長すぎる場合は切り詰める
-    if (strlen($plainContent) > 4000) {
-        $plainContent = substr($plainContent, 0, 4000) . "...";
-        error_log("Content truncated for analysis to 4000 characters");
-    }
     
     // OpenAI APIへのリクエスト内容
     $prompt = "以下の記事のSEO観点での問題点を分析してください。具体的な改善ポイントを箇条書きで示してください。\n\n";
@@ -445,40 +500,15 @@ function analyzeArticleIssues($title, $description, $content) {
         'Authorization: Bearer ' . $apiKey
     ]);
     
-    // タイムアウト設定を追加
-    curl_setopt($ch, CURLOPT_TIMEOUT, 180); // 180秒のタイムアウト
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 60); // 接続タイムアウト60秒
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ
-    
-    error_log("Sending request to OpenAI API for article analysis");
     $response = curl_exec($ch);
-    
-    if (curl_errno($ch)) {
-        $curlError = curl_error($ch);
-        error_log("cURL error in analyzeArticleIssues: " . $curlError);
-        curl_close($ch);
-        return "分析中にエラーが発生しました: " . $curlError;
-    }
-    
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    
-    error_log("OpenAI API response code for analysis: " . $httpCode);
-    
-    if ($httpCode != 200) {
-        error_log("HTTP error in OpenAI API call for analysis: " . $httpCode);
-        error_log("Response: " . substr($response, 0, 1000));
-        return "分析中にAPIエラーが発生しました (HTTP {$httpCode})";
-    }
     
     $result = json_decode($response, true);
     
     if (isset($result['choices'][0]['message']['content'])) {
-        error_log("Successfully received analysis from OpenAI");
         return $result['choices'][0]['message']['content'];
     }
     
-    error_log("Failed to parse OpenAI response for analysis");
     return '分析中にエラーが発生しました。';
 }
 
@@ -492,15 +522,11 @@ function analyzeArticleIssues($title, $description, $content) {
  * @return array 改善された記事（タイトル、ディスクリプション、本文）
  */
 function improveArticle($title, $description, $content, $issues) {
-    // 処理時間の制限を設定（最大実行時間を300秒に設定）
-    set_time_limit(300);
+    // 処理時間の制限を設定（最大実行時間を180秒に設定）
+    set_time_limit(180);
     
     // メモリ制限を緩和
     ini_set('memory_limit', '512M');
-    
-    // タイムアウトを防ぐための設定
-    ini_set('max_execution_time', 300);
-    ini_set('default_socket_timeout', 300);
     
     try {
         // OpenAI APIのモデルとエンドポイント
@@ -610,8 +636,7 @@ function improveArticle($title, $description, $content, $issues) {
             'Content-Type: application/json',
             'Authorization: Bearer ' . $apiKey
         ]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 180); // タイムアウトを180秒に設定
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 60); // 接続タイムアウト60秒
+        curl_setopt($ch, CURLOPT_TIMEOUT, 120); // タイムアウトを120秒に設定
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ
         
         error_log("Sending request to OpenAI API");

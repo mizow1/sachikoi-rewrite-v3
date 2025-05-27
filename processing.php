@@ -26,7 +26,7 @@ $pageTitle = "処理中...";
     <title><?php echo $pageTitle; ?></title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <meta http-equiv="refresh" content="2;url=process_single.php">
+    <meta http-equiv="refresh" content="5;url=process_single.php">
     <style>
         .progress-container {
             width: 100%;

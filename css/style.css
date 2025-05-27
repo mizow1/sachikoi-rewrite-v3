@@ -104,18 +104,39 @@ footer {
 
 .filter-controls {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
+    gap: 15px;
+}
+
+.filter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .filter-controls label {
     font-weight: bold;
+    white-space: nowrap;
 }
 
 .filter-controls select {
     padding: 6px 10px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
+    min-width: 180px;
+}
+
+.filter-controls input[type="text"] {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    min-width: 200px;
+}
+
+.filter-controls .btn-small {
+    padding: 6px 12px;
+    margin-left: 5px;
 }
 
 /* URL一覧テーブル */

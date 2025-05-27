@@ -10,22 +10,71 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // URLパラメータを取得
+    const urlParams = new URLSearchParams(window.location.search);
+    const sortParam = urlParams.get('sort');
+    const keywordParam = urlParams.get('keyword');
+
+    // キーワード検索の処理
+    const keywordInput = document.getElementById('keyword');
+    const searchBtn = document.getElementById('searchBtn');
+    
+    if (keywordInput && searchBtn) {
+        // キーワードパラメータがあれば入力欄に反映
+        if (keywordParam) {
+            keywordInput.value = keywordParam;
+        }
+        
+        // 検索ボタンクリック時の処理
+        searchBtn.addEventListener('click', function() {
+            applyFilters();
+        });
+        
+        // Enterキー押下時の処理
+        keywordInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // フォーム送信を防止
+                applyFilters();
+            }
+        });
+    }
+
     // 並び替え処理
     const sortBySelect = document.getElementById('sortBy');
     if (sortBySelect) {
-        sortBySelect.addEventListener('change', function() {
-            const form = document.getElementById('rewriteForm');
-            // 並び替えパラメータをURLに追加して現在のページをリロード
-            const sortValue = sortBySelect.value;
-            window.location.href = `index.php?sort=${sortValue}`;
-        });
-
-        // URLから並び替え設定を取得して反映
-        const urlParams = new URLSearchParams(window.location.search);
-        const sortParam = urlParams.get('sort');
+        // ソートパラメータがあれば選択状態に反映
         if (sortParam) {
             sortBySelect.value = sortParam;
         }
+        
+        // 並び替え変更時の処理
+        sortBySelect.addEventListener('change', function() {
+            applyFilters();
+        });
+    }
+    
+    // フィルターを適用する関数
+    function applyFilters() {
+        const keyword = keywordInput ? keywordInput.value : '';
+        const sort = sortBySelect ? sortBySelect.value : 'impressions_desc';
+        
+        // URLを生成してリダイレクト
+        let url = 'index.php';
+        let params = [];
+        
+        if (keyword) {
+            params.push(`keyword=${encodeURIComponent(keyword)}`);
+        }
+        
+        if (sort) {
+            params.push(`sort=${encodeURIComponent(sort)}`);
+        }
+        
+        if (params.length > 0) {
+            url += '?' + params.join('&');
+        }
+        
+        window.location.href = url;
     }
 
     // 記事内容のプレビュー表示の高さ調整

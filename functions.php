@@ -448,8 +448,10 @@ function improveArticle($title, $description, $content, $issues) {
 1. タイトルは30-40文字程度でSEO的に最適化する
 2. メタディスクリプションは120-140文字程度でクリック率を高める内容にする
 3. 記事本文は5000文字以上で、読者が求める情報を網羅的に提供する
-4. 見出しを適切に使用し、読みやすい構成にする
-5. キーワードを自然に配置し、SEO効果を高める';
+4. 見出しはh2、h3、h4、h5のHTMLタグを使用し、段落はpタグを使用する
+5. キーワードを自然に配置し、SEO効果を高める
+
+重要：記事本文はHTML形式で出力してください。見出しはh2、h3、h4、h5タグ、段落はpタグを使用してください。マークダウン形式は使用しないでください。';
         
         $userContent = "元の記事:\nタイトル: {$cleanTitle}\nメタディスクリプション: {$cleanDescription}\n本文: {$cleanContent}\n\n{$issuesList}\n\n改善した記事を以下のフォーマットで出力してください：\nタイトル: [改善されたタイトル]\nメタディスクリプション: [改善されたメタディスクリプション]\n本文: [改善された本文]";
         
@@ -546,13 +548,18 @@ function improveArticle($title, $description, $content, $issues) {
         if (preg_match('/本文:\s*(.+?)$/s', $improvedContent, $bodyMatches)) {
             $extractedBody = trim($bodyMatches[1]);
             if (!empty($extractedBody)) {
+                // マークダウンからHTMLへの変換処理
                 $improvedBody = $extractedBody;
-                error_log("Extracted improved body: length=" . strlen($improvedBody));
+                
+                // マークダウン形式の見出しをHTMLに変換
+                $improvedBody = convertMarkdownToHtml($improvedBody);
+                
+                error_log("Extracted and converted improved body: length=" . strlen($improvedBody));
             }
         } else {
             // 本文タグが見つからない場合は、フォーマットが異なる可能性があるので全体を本文として扱う
             error_log("Body tag not found, using entire content as body");
-            $improvedBody = $improvedContent;
+            $improvedBody = convertMarkdownToHtml($improvedContent);
         }
         
         return [
@@ -974,6 +981,75 @@ function writeRewriteResult($url, $originalContent, $issues, $improvedData) {
 }
 
 /**
+ * マークダウン形式のテキストをHTMLに変換する関数
+ * 
+ * @param string $markdown マークダウン形式のテキスト
+ * @return string HTML形式のテキスト
+ */
+function convertMarkdownToHtml($markdown) {
+    // 既にHTML形式の場合はそのまま返す
+    if (strpos($markdown, '<h2>') !== false || strpos($markdown, '<p>') !== false) {
+        return $markdown;
+    }
+    
+    // 改行を正規化
+    $markdown = str_replace("\r\n", "\n", $markdown);
+    
+    // 見出しの変換
+    $html = preg_replace('/^## (.+?)$/m', '<h2>$1</h2>', $markdown);
+    $html = preg_replace('/^### (.+?)$/m', '<h3>$1</h3>', $html);
+    $html = preg_replace('/^#### (.+?)$/m', '<h4>$1</h4>', $html);
+    $html = preg_replace('/^##### (.+?)$/m', '<h5>$1</h5>', $html);
+    
+    // 段落の変換
+    // 空行で区切られたブロックを段落として扱う
+    $paragraphs = preg_split('/\n\s*\n/', $html);
+    $html = '';
+    foreach ($paragraphs as $paragraph) {
+        $paragraph = trim($paragraph);
+        if (!empty($paragraph)) {
+            // 既にHTMLタグで始まる場合はそのまま使用
+            if (preg_match('/^<(h[2-5]|p|ul|ol|li|blockquote|pre|div)/i', $paragraph)) {
+                $html .= $paragraph . "\n\n";
+            } else {
+                $html .= '<p>' . $paragraph . '</p>' . "\n\n";
+            }
+        }
+    }
+    
+    // リストの変換
+    $html = preg_replace('/^- (.+?)$/m', '<li>$1</li>', $html);
+    $html = preg_replace('/(<li>.+?<\/li>\s*)+/s', '<ul>$0</ul>', $html);
+    
+    // 番号付きリストの変換
+    $html = preg_replace('/^\d+\. (.+?)$/m', '<li>$1</li>', $html);
+    $html = preg_replace('/(<li>.+?<\/li>\s*)+/s', '<ol>$0</ol>', $html);
+    
+    // 二重にネストされたリストを修正
+    $html = str_replace("<ul><ol>", "<ol>", $html);
+    $html = str_replace("</ol></ul>", "</ol>", $html);
+    
+    // 強調の変換
+    $html = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $html);
+    $html = preg_replace('/\*(.+?)\*/s', '<em>$1</em>', $html);
+    
+    // リンクの変換
+    $html = preg_replace('/\[(.+?)\]\((.+?)\)/s', '<a href="$2">$1</a>', $html);
+    
+    // 不要なタグの修正
+    $html = str_replace("<p><h2>", "<h2>", $html);
+    $html = str_replace("</h2></p>", "</h2>", $html);
+    $html = str_replace("<p><h3>", "<h3>", $html);
+    $html = str_replace("</h3></p>", "</h3>", $html);
+    $html = str_replace("<p><h4>", "<h4>", $html);
+    $html = str_replace("</h4></p>", "</h4>", $html);
+    $html = str_replace("<p><h5>", "<h5>", $html);
+    $html = str_replace("</h5></p>", "</h5>", $html);
+    
+    return $html;
+}
+
+/**
  * 改善された記事データをJSONから解析する関数
  * 
  * @param string $jsonData JSON形式の記事データ
@@ -983,6 +1059,10 @@ function parseImprovedArticleData($jsonData) {
     $data = json_decode($jsonData, true);
     
     if (is_array($data) && isset($data['title']) && isset($data['description']) && isset($data['content'])) {
+        // 本文がマークダウン形式の場合はHTMLに変換
+        if (isset($data['content'])) {
+            $data['content'] = convertMarkdownToHtml($data['content']);
+        }
         return $data;
     }
     
@@ -1001,6 +1081,8 @@ function parseImprovedArticleData($jsonData) {
     
     if (preg_match('/本文:\s*(.+?)$/s', $jsonData, $bodyMatches)) {
         $content = trim($bodyMatches[1]);
+        // マークダウンからHTMLに変換
+        $content = convertMarkdownToHtml($content);
     }
     
     return [

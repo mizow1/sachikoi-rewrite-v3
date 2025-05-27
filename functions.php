@@ -415,11 +415,25 @@ function improveArticle($title, $description, $content, $issues) {
         
         error_log("Improving article with OpenAI API. Model: " . $model);
         
-        // コンテンツが長すぎる場合は切り詰める
-        if (strlen($content) > 5000) {
-            error_log("Content too long, truncating to 5000 characters for API request");
-            $content = substr($content, 0, 5000) . "...";
+        // 記事本文から<p>関連の夢</p>以降を除外し、リライト対象外とする
+        $contentToRewrite = $content;
+        $preservedContent = '';
+        
+        // <p>関連の夢</p>を含む場合、その部分で分割
+        if (preg_match('/(<p>\s*関連の夢\s*<\/p>.*)/is', $content, $matches)) {
+            $contentToRewrite = str_replace($matches[1], '', $content);
+            $preservedContent = $matches[1];
+            error_log("Found related dream section, preserving it for later: " . substr($preservedContent, 0, 100) . "...");
         }
+        
+        // リライト対象のコンテンツが長すぎる場合は切り詰める
+        if (strlen($contentToRewrite) > 5000) {
+            error_log("Content to rewrite is too long, truncating to 5000 characters for API request");
+            $contentToRewrite = substr($contentToRewrite, 0, 5000) . "...";
+        }
+        
+        // 元のコンテンツをリライト対象のコンテンツに置き換える
+        $content = $contentToRewrite;
         
         // 問題点のリスト
         $issuesList = '';
@@ -442,16 +456,21 @@ function improveArticle($title, $description, $content, $issues) {
         $cleanContent = preg_replace('/[\x00-\x1F\x7F]/u', '', $cleanContent);
         
         // APIリクエストデータ
-        $systemContent = '以下の記事を改善してください。SEO的に最適化し、読みやすく、魅力的な内容にしてください。
+        $systemContent = '以下の記事を大幅に改善してください。SEO的に最適化し、読みやすく、魅力的な内容にしてください。
 
 具体的な要件：
-1. タイトルは30-40文字程度でSEO的に最適化する
-2. メタディスクリプションは120-140文字程度でクリック率を高める内容にする
-3. 記事本文は5000文字以上で、読者が求める情報を網羅的に提供する
+1. タイトルは必ず元のタイトルとは異なるものにし、30-40文字程度でSEO的に最適化する
+2. メタディスクリプションも必ず元のものとは異なるものにし、120-140文字程度でクリック率を高める内容にする
+3. 記事本文は8000文字以上で、読者が求める情報を網羅的に提供する
 4. 見出しはh2、h3、h4、h5のHTMLタグを使用し、段落はpタグを使用する
 5. キーワードを自然に配置し、SEO効果を高める
+6. 関連ページの紹介は含めないでください
 
-重要：記事本文はHTML形式で出力してください。見出しはh2、h3、h4、h5タグ、段落はpタグを使用してください。マークダウン形式は使用しないでください。';
+重要：
+- 記事本文はHTML形式で出力してください。見出しはh2、h3、h4、h5タグ、段落はpタグを使用してください。
+- タイトルとメタディスクリプションは必ず元のものから変更してください。プレースホルダーのままにしないでください。
+- マークダウン形式は使用しないでください。
+- 内容は大幅に拡充して、詳細な情報を提供してください。';
         
         $userContent = "元の記事:\nタイトル: {$cleanTitle}\nメタディスクリプション: {$cleanDescription}\n本文: {$cleanContent}\n\n{$issuesList}\n\n改善した記事を以下のフォーマットで出力してください：\nタイトル: [改善されたタイトル]\nメタディスクリプション: [改善されたメタディスクリプション]\n本文: [改善された本文]";
         
@@ -467,8 +486,8 @@ function improveArticle($title, $description, $content, $issues) {
                     'content' => $userContent
                 ]
             ],
-            'temperature' => 0.7,
-            'max_tokens' => 4000
+            'temperature' => 0.8, // 創造性を高める
+            'max_tokens' => 8000 // トークン数を増やしてより長文に対応
         ];
         
         // JSONエンコードをデバッグ
@@ -529,19 +548,67 @@ function improveArticle($title, $description, $content, $issues) {
         // タイトルの抽出
         if (preg_match('/タイトル:\s*(.+?)(?=\nメタディスクリプション:|$)/s', $improvedContent, $titleMatches)) {
             $extractedTitle = trim($titleMatches[1]);
-            if (!empty($extractedTitle)) {
-                $improvedTitle = $extractedTitle;
-                error_log("Extracted improved title: " . substr($improvedTitle, 0, 50));
+            if (!empty($extractedTitle) && $extractedTitle !== '[改善されたタイトル]') {
+                // 元のタイトルと同じ場合は、変更されていないと判断
+                if ($extractedTitle === $title) {
+                    // 元のタイトルにキーワードを追加して変更する
+                    $keywords = ['意味', '解釈', '夢占い', '夢診断', 'シンボル', '暦社', '夢占術'];
+                    $randomKeyword = $keywords[array_rand($keywords)];
+                    $improvedTitle = $title . ' | ' . $randomKeyword;
+                    error_log("Title was not changed, adding keyword: " . $randomKeyword);
+                } else {
+                    $improvedTitle = $extractedTitle;
+                    error_log("Extracted improved title: " . substr($improvedTitle, 0, 50));
+                }
+            } else {
+                // プレースホルダーのままの場合、元のタイトルを改善
+                $keywords = ['意味と解釈', '夢占い分析', '夢診断ガイド', 'シンボルの意味', '夢占術完全解説'];
+                $randomKeyword = $keywords[array_rand($keywords)];
+                $improvedTitle = $title . ' | ' . $randomKeyword;
+                error_log("Title placeholder detected, creating new title: " . $improvedTitle);
             }
+        } else {
+            // タイトルが見つからない場合、元のタイトルを改善
+            $keywords = ['意味と解釈', '夢占い分析', '夢診断ガイド', 'シンボルの意味', '夢占術完全解説'];
+            $randomKeyword = $keywords[array_rand($keywords)];
+            $improvedTitle = $title . ' | ' . $randomKeyword;
+            error_log("No title found in response, creating new title: " . $improvedTitle);
         }
         
         // メタディスクリプションの抽出
         if (preg_match('/メタディスクリプション:\s*(.+?)(?=\n本文:|$)/s', $improvedContent, $descMatches)) {
             $extractedDesc = trim($descMatches[1]);
-            if (!empty($extractedDesc)) {
-                $improvedDescription = $extractedDesc;
-                error_log("Extracted improved description: " . substr($improvedDescription, 0, 50));
+            if (!empty($extractedDesc) && $extractedDesc !== '[改善されたメタディスクリプション]') {
+                // 元のディスクリプションと同じ場合は、変更されていないと判断
+                if ($extractedDesc === $description) {
+                    // 元のディスクリプションを改善
+                    $improvedDescription = $extractedDesc . ' 夢占いで未来を占い、夢の意味を詳しく解説します。夢診断で自分自身をより深く知りましょう。';
+                    // 140文字に制限
+                    if (mb_strlen($improvedDescription) > 140) {
+                        $improvedDescription = mb_substr($improvedDescription, 0, 137) . '...';
+                    }
+                    error_log("Description was not changed, creating new one");
+                } else {
+                    $improvedDescription = $extractedDesc;
+                    error_log("Extracted improved description: " . substr($improvedDescription, 0, 50));
+                }
+            } else {
+                // プレースホルダーのままの場合、元のディスクリプションを改善
+                $improvedDescription = "夢占いで「" . $title . "」の意味を詳しく解説します。夢の中に表れるシンボルの意味や心理状態、未来への影響について夢診断で分析します。";
+                // 140文字に制限
+                if (mb_strlen($improvedDescription) > 140) {
+                    $improvedDescription = mb_substr($improvedDescription, 0, 137) . '...';
+                }
+                error_log("Description placeholder detected, creating new description");
             }
+        } else {
+            // ディスクリプションが見つからない場合、元のディスクリプションを改善
+            $improvedDescription = "夢占いで「" . $title . "」の意味を詳しく解説します。夢の中に表れるシンボルの意味や心理状態、未来への影響について夢診断で分析します。";
+            // 140文字に制限
+            if (mb_strlen($improvedDescription) > 140) {
+                $improvedDescription = mb_substr($improvedDescription, 0, 137) . '...';
+            }
+            error_log("No description found in response, creating new description");
         }
         
         // 本文の抽出
@@ -565,8 +632,26 @@ function improveArticle($title, $description, $content, $issues) {
                     $improvedBody = preg_replace('/^メタディスクリプション:.+?\n/m', '', $improvedBody);
                 }
                 
+                // 関連ページの紹介を削除
+                $improvedBody = preg_replace('/<h[2-3][^>]*>\s*関連する他の夢\s*<\/h[2-3]>.*?(<h[2-3]|$)/is', '$1', $improvedBody);
+                $improvedBody = preg_replace('/<h[2-3][^>]*>\s*関連ページ\s*<\/h[2-3]>.*?(<h[2-3]|$)/is', '$1', $improvedBody);
+                $improvedBody = preg_replace('/<h[2-3][^>]*>\s*関連記事\s*<\/h[2-3]>.*?(<h[2-3]|$)/is', '$1', $improvedBody);
+                $improvedBody = preg_replace('/<h[2-3][^>]*>\s*関連リンク\s*<\/h[2-3]>.*?(<h[2-3]|$)/is', '$1', $improvedBody);
+                
+                // リンク付きのリストを削除
+                $improvedBody = preg_replace('/<ul>\s*<li>\s*<a href=[^>]*>[^<]*<\/a>\s*<\/li>\s*<\/ul>/is', '', $improvedBody);
+                
+                // div.article_elementを削除
+                $improvedBody = preg_replace('/<div class="article_element[^"]*".*?<\/div>\s*<\/div>/is', '', $improvedBody);
+                
                 // マークダウン形式の見出しをHTMLに変換
                 $improvedBody = convertMarkdownToHtml($improvedBody);
+                
+                // 保存しておいた<p>関連の夢</p>以降のコンテンツを元に戻す
+                if (!empty($preservedContent)) {
+                    $improvedBody .= $preservedContent;
+                    error_log("Appended preserved content back to the improved body");
+                }
                 
                 error_log("Extracted and cleaned improved body: length=" . strlen($improvedBody));
             }
@@ -590,7 +675,25 @@ function improveArticle($title, $description, $content, $issues) {
                 $cleanedContent = preg_replace('/^メタディスクリプション:.+?\n/m', '', $cleanedContent);
             }
             
+            // 関連ページの紹介を削除
+            $cleanedContent = preg_replace('/<h[2-3][^>]*>\s*関連する他の夢\s*<\/h[2-3]>.*?(<h[2-3]|$)/is', '$1', $cleanedContent);
+            $cleanedContent = preg_replace('/<h[2-3][^>]*>\s*関連ページ\s*<\/h[2-3]>.*?(<h[2-3]|$)/is', '$1', $cleanedContent);
+            $cleanedContent = preg_replace('/<h[2-3][^>]*>\s*関連記事\s*<\/h[2-3]>.*?(<h[2-3]|$)/is', '$1', $cleanedContent);
+            $cleanedContent = preg_replace('/<h[2-3][^>]*>\s*関連リンク\s*<\/h[2-3]>.*?(<h[2-3]|$)/is', '$1', $cleanedContent);
+            
+            // リンク付きのリストを削除
+            $cleanedContent = preg_replace('/<ul>\s*<li>\s*<a href=[^>]*>[^<]*<\/a>\s*<\/li>\s*<\/ul>/is', '', $cleanedContent);
+            
+            // div.article_elementを削除
+            $cleanedContent = preg_replace('/<div class="article_element[^"]*".*?<\/div>\s*<\/div>/is', '', $cleanedContent);
+            
             $improvedBody = convertMarkdownToHtml($cleanedContent);
+            
+            // 保存しておいた<p>関連の夢</p>以降のコンテンツを元に戻す
+            if (!empty($preservedContent)) {
+                $improvedBody .= $preservedContent;
+                error_log("Appended preserved content back to the improved body");
+            }
         }
         
         return [

@@ -405,7 +405,7 @@ function improveArticle($title, $description, $content, $issues) {
     set_time_limit(180);
     
     // メモリ制限を緩和
-    ini_set('memory_limit', '256M');
+    ini_set('memory_limit', '512M');
     
     try {
         // OpenAI APIのモデルとエンドポイント
@@ -416,9 +416,9 @@ function improveArticle($title, $description, $content, $issues) {
         error_log("Improving article with OpenAI API. Model: " . $model);
         
         // コンテンツが長すぎる場合は切り詰める
-        if (strlen($content) > 3000) {
-            error_log("Content too long, truncating to 3000 characters");
-            $content = substr($content, 0, 3000) . "...";
+        if (strlen($content) > 5000) {
+            error_log("Content too long, truncating to 5000 characters for API request");
+            $content = substr($content, 0, 5000) . "...";
         }
         
         // 問題点のリスト
@@ -442,7 +442,15 @@ function improveArticle($title, $description, $content, $issues) {
         $cleanContent = preg_replace('/[\x00-\x1F\x7F]/u', '', $cleanContent);
         
         // APIリクエストデータ
-        $systemContent = '以下の記事を改善してください。SEO的に最適化し、読みやすく、魅力的な内容にしてください。';
+        $systemContent = '以下の記事を改善してください。SEO的に最適化し、読みやすく、魅力的な内容にしてください。
+
+具体的な要件：
+1. タイトルは30-40文字程度でSEO的に最適化する
+2. メタディスクリプションは120-140文字程度でクリック率を高める内容にする
+3. 記事本文は5000文字以上で、読者が求める情報を網羅的に提供する
+4. 見出しを適切に使用し、読みやすい構成にする
+5. キーワードを自然に配置し、SEO効果を高める';
+        
         $userContent = "元の記事:\nタイトル: {$cleanTitle}\nメタディスクリプション: {$cleanDescription}\n本文: {$cleanContent}\n\n{$issuesList}\n\n改善した記事を以下のフォーマットで出力してください：\nタイトル: [改善されたタイトル]\nメタディスクリプション: [改善されたメタディスクリプション]\n本文: [改善された本文]";
         
         $requestData = [
@@ -458,7 +466,7 @@ function improveArticle($title, $description, $content, $issues) {
                 ]
             ],
             'temperature' => 0.7,
-            'max_tokens' => 2000
+            'max_tokens' => 4000
         ];
         
         // JSONエンコードをデバッグ
@@ -585,6 +593,13 @@ function getOriginalArticle($sheetData, $url) {
             if (isset($row[5]) && !empty($row[5])) {
                 error_log("Using existing content from spreadsheet");
                 $originalContent = $row[5];
+                
+                // 既存データから記事情報を抽出
+                $title = isset($row[3]) && !empty($row[3]) ? $row[3] : '';
+                $description = isset($row[4]) && !empty($row[4]) ? $row[4] : '';
+                $content = $originalContent;
+                
+                error_log("Using existing title and description from spreadsheet");
             } else {
                 // URLから直接記事データを取得する
                 error_log("Fetching article content from URL: " . $url);
@@ -612,31 +627,102 @@ function getOriginalArticle($sheetData, $url) {
                         error_log("HTTP error: " . $httpCode);
                         throw new Exception("HTTP error: " . $httpCode);
                     }
+                    
+                    // DOMを使用して特定の要素を抽出
+                    $dom = new DOMDocument();
+                    @$dom->loadHTML(mb_convert_encoding($originalContent, 'HTML-ENTITIES', 'UTF-8'));
+                    $xpath = new DOMXPath($dom);
+                    
+                    // 記事タイトルをh1.article_titleから取得
+                    $title = '';
+                    $titleNodes = $xpath->query('//h1[contains(@class, "article_title")]');
+                    if ($titleNodes->length > 0) {
+                        $title = trim($titleNodes->item(0)->textContent);
+                        error_log("Extracted title from h1.article_title: " . $title);
+                    }
+                    
+                    // 記事本文を.article_bodyから取得し、本文のみを抽出
+                    $content = '';
+                    $bodyNodes = $xpath->query('//*[contains(@class, "article_body")]');
+                    if ($bodyNodes->length > 0) {
+                        $bodyNode = $bodyNodes->item(0);
+                        // 記事本文のみを抽出するために、内部HTMLだけを取得
+                        $innerContent = '';
+                        foreach ($bodyNode->childNodes as $childNode) {
+                            $innerContent .= $dom->saveHTML($childNode);
+                        }
+                        $content = $innerContent;
+                        error_log("Extracted content from .article_body (inner content only), length: " . strlen($content));
+                    }
+                    
+                    // タイトルが見つからない場合はtitleタグから取得
+                    if (empty($title)) {
+                        $titleTags = $xpath->query('//title');
+                        if ($titleTags->length > 0) {
+                            $title = trim($titleTags->item(0)->textContent);
+                            error_log("Falling back to title tag: " . $title);
+                        }
+                    }
+                    
+                    // 本文が見つからない場合はbodyタグ全体を使用
+                    if (empty($content)) {
+                        $bodyTags = $xpath->query('//body');
+                        if ($bodyTags->length > 0) {
+                            $content = $dom->saveHTML($bodyTags->item(0));
+                            error_log("Falling back to body tag content, length: " . strlen($content));
+                        } else {
+                            $content = $originalContent;
+                            error_log("Using full HTML as content");
+                        }
+                    }
+                    
+                    // メタディスクリプションを取得する方法を改善
+                    $description = '';
+                    
+                    // 方法１：meta[name="description"]から取得
+                    $metaNodes = $xpath->query('//meta[@name="description"]');
+                    if ($metaNodes->length > 0) {
+                        $metaNode = $metaNodes->item(0);
+                        if ($metaNode instanceof DOMElement) {
+                            $description = $metaNode->getAttribute('content');
+                            error_log("Extracted meta description from meta tag: " . $description);
+                        }
+                    }
+                    
+                    // 方法２：meta[property="og:description"]から取得
+                    if (empty($description)) {
+                        $ogDescNodes = $xpath->query('//meta[@property="og:description"]');
+                        if ($ogDescNodes->length > 0) {
+                            $ogDescNode = $ogDescNodes->item(0);
+                            if ($ogDescNode instanceof DOMElement) {
+                                $description = $ogDescNode->getAttribute('content');
+                                error_log("Extracted meta description from og:description: " . $description);
+                            }
+                        }
+                    }
+                    
+                    // 方法３：記事の最初の段落から生成
+                    if (empty($description) || $description === $title) {
+                        $paragraphs = $xpath->query('//div[contains(@class, "article_body")]//p');
+                        if ($paragraphs->length > 0) {
+                            $firstPara = $paragraphs->item(0)->textContent;
+                            if (strlen($firstPara) > 10) { // 最低限の長さチェック
+                                $description = mb_substr(trim($firstPara), 0, 120, 'UTF-8');
+                                if (strlen($firstPara) > 120) {
+                                    $description .= '...';
+                                }
+                                error_log("Generated description from first paragraph: " . $description);
+                            }
+                        }
+                    }
+                    
                 } catch (Exception $e) {
                     error_log("Error fetching article: " . $e->getMessage());
                     // エラーの場合はダミーコンテンツを使用
-                    $originalContent = "<h1>記事取得エラー</h1><p>URL: {$url}</p>";
+                    $title = "記事取得エラー";
+                    $description = "URL: {$url} からの記事取得に失敗しました。";
+                    $content = "<h1>記事取得エラー</h1><p>URL: {$url}</p>";
                 }
-            }
-            
-            // データの形式を確認
-            error_log("Content length: " . strlen($originalContent));
-            error_log("Content preview: " . substr($originalContent, 0, 200));
-            
-            // タイトルとディスクリプションを抽出
-            $title = '';
-            $description = '';
-            
-            // タイトルを取得
-            if (preg_match('/<title>(.*?)<\/title>/is', $originalContent, $titleMatches)) {
-                $title = trim($titleMatches[1]);
-                error_log("Extracted title from HTML: " . $title);
-            }
-            
-            // ディスクリプションを取得
-            if (preg_match('/<meta[^>]*name=["\']description["\'](\s+|\s+content=["\'](.*?)["\'](　+|>))/is', $originalContent, $descMatches)) {
-                $description = isset($descMatches[2]) ? trim($descMatches[2]) : '';
-                error_log("Extracted description from HTML: " . $description);
             }
             
             // タイトルが見つからない場合はURLから生成
@@ -647,18 +733,12 @@ function getOriginalArticle($sheetData, $url) {
                 error_log("Generated title from URL: " . $title);
             }
             
-            // ディスクリプションが見つからない場合はタイトルから生成
-            if (empty($description)) {
-                $description = $title;
-                error_log("Using title as description");
-            }
-            
-            // 本文部分を抽出する試み
-            // コンテンツ部分を抽出する正規表現を改善
-            $content = $originalContent;
-            if (preg_match('/<body[^>]*>(.*?)<\/body>/is', $originalContent, $bodyMatches)) {
-                $content = $bodyMatches[1];
-                error_log("Extracted body content");
+            // ディスクリプションが見つからない場合はタイトルとURLから生成
+            if (empty($description) || $description === $title) {
+                $urlPath = parse_url($url, PHP_URL_PATH);
+                $description = $title . ' - ' . str_replace(['-', '_'], ' ', $urlPath);
+                $description = mb_substr($description, 0, 120, 'UTF-8');
+                error_log("Generated unique description from title and URL: " . $description);
             }
             
             error_log("Successfully fetched and parsed article content");
@@ -688,19 +768,63 @@ function getLatestRewriteData($sheetData, $url) {
             $columnIndex = 5; // F列から開始（0ベースなので5）
             $latestRewriteData = null;
             
-            // 元の記事、問題点、書き直し日時、書き直し後の記事のパターンを検出
-            while (isset($row[$columnIndex + 3])) { // 4列セットで確認
+            // データ形式を確認して処理を分岐
+            // 新形式：元の記事、問題点、日時、タイトル、ディスクリプション、本文の6列セット
+            // 旧形式：元の記事、問題点、日時、改善された記事（JSON）の4列セット
+            
+            // 新形式のデータを確認
+            while (isset($row[$columnIndex + 5])) { // 6列セットで確認
                 if (!empty($row[$columnIndex]) && !empty($row[$columnIndex + 1]) && 
-                    !empty($row[$columnIndex + 2]) && !empty($row[$columnIndex + 3])) {
-                    // 最新のリライトデータを更新
+                    !empty($row[$columnIndex + 2]) && !empty($row[$columnIndex + 3]) &&
+                    !empty($row[$columnIndex + 4]) && !empty($row[$columnIndex + 5])) {
+                    
+                    // 最新のリライトデータを更新（個別の値として取得）
                     $latestRewriteData = [
                         'original' => $row[$columnIndex],
                         'issues' => $row[$columnIndex + 1],
                         'datetime' => $row[$columnIndex + 2],
-                        'improved' => $row[$columnIndex + 3]
+                        'title' => $row[$columnIndex + 3],
+                        'description' => $row[$columnIndex + 4],
+                        'content' => $row[$columnIndex + 5]
                     ];
+                    
+                    // 互換性のために旧形式のキーも設定
+                    $latestRewriteData['improved'] = json_encode([
+                        'title' => $row[$columnIndex + 3],
+                        'description' => $row[$columnIndex + 4],
+                        'content' => $row[$columnIndex + 5]
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    
+                    $columnIndex += 6; // 次の6列セットへ
+                    continue;
                 }
-                $columnIndex += 4; // 次の4列セットへ
+                $columnIndex += 6;
+            }
+            
+            // 新形式のデータが見つからなかった場合は、旧形式を確認
+            if ($latestRewriteData === null) {
+                $columnIndex = 5; // 再度F列から開始
+                
+                while (isset($row[$columnIndex + 3])) { // 4列セットで確認
+                    if (!empty($row[$columnIndex]) && !empty($row[$columnIndex + 1]) && 
+                        !empty($row[$columnIndex + 2]) && !empty($row[$columnIndex + 3])) {
+                        
+                        // 最新のリライトデータを更新
+                        $latestRewriteData = [
+                            'original' => $row[$columnIndex],
+                            'issues' => $row[$columnIndex + 1],
+                            'datetime' => $row[$columnIndex + 2],
+                            'improved' => $row[$columnIndex + 3]
+                        ];
+                        
+                        // JSON形式の改善データを解析して個別の値として設定
+                        $improvedData = parseImprovedArticleData($row[$columnIndex + 3]);
+                        $latestRewriteData['title'] = $improvedData['title'];
+                        $latestRewriteData['description'] = $improvedData['description'];
+                        $latestRewriteData['content'] = $improvedData['content'];
+                    }
+                    $columnIndex += 4; // 次の4列セットへ
+                }
             }
             
             return $latestRewriteData;
@@ -789,44 +913,53 @@ function writeRewriteResult($url, $originalContent, $issues, $improvedData) {
         $issues = mb_substr($issues, 0, 5000, 'UTF-8') . "...(truncated)";
     }
     
-    // 改善されたコンテンツをJSON形式に変換
+    // 改善されたデータの処理
     try {
-        // タイトルと説明を制限
-        if (isset($improvedData['title']) && strlen($improvedData['title']) > 500) {
-            $improvedData['title'] = mb_substr($improvedData['title'], 0, 500, 'UTF-8');
+        // タイトル、メタディスクリプション、本文を個別に処理
+        $improvedTitle = isset($improvedData['title']) ? $improvedData['title'] : '';
+        $improvedDescription = isset($improvedData['description']) ? $improvedData['description'] : '';
+        $improvedContent = isset($improvedData['content']) ? $improvedData['content'] : '';
+        
+        // データサイズの制限
+        if (strlen($improvedTitle) > 500) {
+            $improvedTitle = mb_substr($improvedTitle, 0, 500, 'UTF-8');
+            error_log("Improved title truncated to 500 characters");
         }
         
-        if (isset($improvedData['description']) && strlen($improvedData['description']) > 1000) {
-            $improvedData['description'] = mb_substr($improvedData['description'], 0, 1000, 'UTF-8');
+        if (strlen($improvedDescription) > 1000) {
+            $improvedDescription = mb_substr($improvedDescription, 0, 1000, 'UTF-8');
+            error_log("Improved description truncated to 1000 characters");
         }
         
-        // 本文を制限
-        if (isset($improvedData['content']) && strlen($improvedData['content']) > 20000) {
-            $improvedData['content'] = mb_substr($improvedData['content'], 0, 20000, 'UTF-8') . "...(truncated)";
+        if (strlen($improvedContent) > 20000) {
+            $improvedContent = mb_substr($improvedContent, 0, 20000, 'UTF-8') . "...(truncated)";
+            error_log("Improved content truncated to 20000 characters");
         }
         
-        $improvedContent = json_encode($improvedData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        error_log("Prepared improved data for writing to spreadsheet");
+        error_log("Title length: " . strlen($improvedTitle));
+        error_log("Description length: " . strlen($improvedDescription));
+        error_log("Content length: " . strlen($improvedContent));
         
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log('JSON encoding error: ' . json_last_error_msg());
-            // フォールバック: 単純なテキスト形式で保存
-            $improvedContent = "タイトル: " . $improvedData['title'] . "\nメタディスクリプション: " . $improvedData['description'] . "\n本文: " . $improvedData['content'];
-        }
     } catch (Exception $e) {
         error_log('Error preparing improved content: ' . $e->getMessage());
-        $improvedContent = "Error: Failed to encode improved content";
+        $improvedTitle = "Error: Failed to process title";
+        $improvedDescription = "Error: Failed to process description";
+        $improvedContent = "Error: Failed to process content";
     }
     
-    // 書き込む範囲を計算
-    $range = $columnLetter . $rowIndex . ':' . chr(65 + $nextColumn + 3) . $rowIndex;
+    // 書き込む範囲を計算 - 個別のセルに分けるために列数を増やす
+    $range = $columnLetter . $rowIndex . ':' . chr(65 + $nextColumn + 5) . $rowIndex;
     error_log("Writing to range: " . $range);
     
-    // 書き込むデータ
+    // 書き込むデータ - 個別のセルに分ける
     $values = [[
-        $originalContent,
-        $issues,
-        $datetime,
-        $improvedContent
+        $originalContent,   // 元の記事内容
+        $issues,           // 問題点
+        $datetime,         // 日時
+        $improvedTitle,    // 改善されたタイトル
+        $improvedDescription, // 改善されたメタディスクリプション
+        $improvedContent   // 改善された本文
     ]];
     
     // スプレッドシートに書き込み

@@ -551,15 +551,46 @@ function improveArticle($title, $description, $content, $issues) {
                 // マークダウンからHTMLへの変換処理
                 $improvedBody = $extractedBody;
                 
+                // HTMLタグや不要な要素を除去する
+                // <title>、<meta>タグを除去
+                $improvedBody = preg_replace('/<title>.*?<\/title>/is', '', $improvedBody);
+                $improvedBody = preg_replace('/<meta[^>]*>/is', '', $improvedBody);
+                
+                // <body>タグの中身だけを抽出
+                if (preg_match('/<body>(.*?)<\/body>/is', $improvedBody, $bodyContentMatches)) {
+                    $improvedBody = trim($bodyContentMatches[1]);
+                } else {
+                    // <body>タグがない場合は、タイトルとメタディスクリプションの行を除去
+                    $improvedBody = preg_replace('/^タイトル:.+?\n/m', '', $improvedBody);
+                    $improvedBody = preg_replace('/^メタディスクリプション:.+?\n/m', '', $improvedBody);
+                }
+                
                 // マークダウン形式の見出しをHTMLに変換
                 $improvedBody = convertMarkdownToHtml($improvedBody);
                 
-                error_log("Extracted and converted improved body: length=" . strlen($improvedBody));
+                error_log("Extracted and cleaned improved body: length=" . strlen($improvedBody));
             }
         } else {
             // 本文タグが見つからない場合は、フォーマットが異なる可能性があるので全体を本文として扱う
             error_log("Body tag not found, using entire content as body");
-            $improvedBody = convertMarkdownToHtml($improvedContent);
+            
+            // HTMLタグや不要な要素を除去
+            $cleanedContent = $improvedContent;
+            
+            // <title>、<meta>タグを除去
+            $cleanedContent = preg_replace('/<title>.*?<\/title>/is', '', $cleanedContent);
+            $cleanedContent = preg_replace('/<meta[^>]*>/is', '', $cleanedContent);
+            
+            // <body>タグの中身だけを抽出
+            if (preg_match('/<body>(.*?)<\/body>/is', $cleanedContent, $bodyContentMatches)) {
+                $cleanedContent = trim($bodyContentMatches[1]);
+            } else {
+                // <body>タグがない場合は、タイトルとメタディスクリプションの行を除去
+                $cleanedContent = preg_replace('/^タイトル:.+?\n/m', '', $cleanedContent);
+                $cleanedContent = preg_replace('/^メタディスクリプション:.+?\n/m', '', $cleanedContent);
+            }
+            
+            $improvedBody = convertMarkdownToHtml($cleanedContent);
         }
         
         return [
@@ -1081,6 +1112,21 @@ function parseImprovedArticleData($jsonData) {
     
     if (preg_match('/本文:\s*(.+?)$/s', $jsonData, $bodyMatches)) {
         $content = trim($bodyMatches[1]);
+        
+        // HTMLタグや不要な要素を除去
+        // <title>、<meta>タグを除去
+        $content = preg_replace('/<title>.*?<\/title>/is', '', $content);
+        $content = preg_replace('/<meta[^>]*>/is', '', $content);
+        
+        // <body>タグの中身だけを抽出
+        if (preg_match('/<body>(.*?)<\/body>/is', $content, $bodyContentMatches)) {
+            $content = trim($bodyContentMatches[1]);
+        } else {
+            // <body>タグがない場合は、タイトルとメタディスクリプションの行を除去
+            $content = preg_replace('/^タイトル:.+?\n/m', '', $content);
+            $content = preg_replace('/^メタディスクリプション:.+?\n/m', '', $content);
+        }
+        
         // マークダウンからHTMLに変換
         $content = convertMarkdownToHtml($content);
     }

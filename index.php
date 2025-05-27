@@ -22,7 +22,7 @@ $debugInfo['データ取得結果'] = [
 
 // キーワードとソート条件を取得
 $keyword = isset($_GET['keyword']) ? $_GET['keyword'] : '';
-$sortBy = isset($_GET['sort']) ? $_GET['sort'] : 'impressions_desc';
+$sortBy = isset($_GET['sort']) ? $_GET['sort'] : 'impressions_asc';
 
 // フィルタリングされたURLリストを取得
 $filteredUrls = getFilteredUrls($sheetData, $keyword, $sortBy);

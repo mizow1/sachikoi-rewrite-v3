@@ -460,7 +460,16 @@ function improveArticle($title, $description, $content, $issues) {
 
 具体的な要件：
 1. タイトルは必ず元のタイトルとは異なるものにし、30-40文字程度でSEO的に最適化する
-2. メタディスクリプションも必ず元のものとは異なるものにし、120-140文字程度でクリック率を高める内容にする
+
+2. メタディスクリプションは非常に重要です。以下の点に注意して作成してください：
+   - 必ず元のものとは完全に異なる内容にする
+   - 120-140文字程度でクリック率を高める内容にする
+   - 実用的な情報や具体的なメリットを含める
+   - 「解説します」「分析します」などの定型的な表現を避ける
+   - ユーザーの情報探索意欲を刺激する表現を使う
+   - キーワードを自然に配置する
+   - 必要に応じて数字や特徴的な表現を入れる
+
 3. 記事本文は8000文字以上で、読者が求める情報を網羅的に提供する
 4. 見出しはh2、h3、h4、h5のHTMLタグを使用し、段落はpタグを使用する
 5. キーワードを自然に配置し、SEO効果を高める
@@ -581,34 +590,63 @@ function improveArticle($title, $description, $content, $issues) {
             if (!empty($extractedDesc) && $extractedDesc !== '[改善されたメタディスクリプション]') {
                 // 元のディスクリプションと同じ場合は、変更されていないと判断
                 if ($extractedDesc === $description) {
-                    // 元のディスクリプションを改善
-                    $improvedDescription = $extractedDesc . ' 夢占いで未来を占い、夢の意味を詳しく解説します。夢診断で自分自身をより深く知りましょう。';
+                    // 高品質なメタディスクリプションテンプレートから選択
+                    $descriptionTemplates = [
+                        "あなたの見た「{$title}」に関する夢には、意外な心理的意味があるかもしれません。精神分析学に基づく7つの解釈と、あなたの夢が示す将来の暦社を揭示します。",
+                        "「{$title}」の夢は、あなたの潜在意識からの重要なメッセージかもしれません。夢占いの専門家が明かす、この夢に秘められた5つの真実と、あなたの人生への影響を探ります。",
+                        "夜に見た「{$title}」の夢は単なる偶然ではありません。古代から伝わる夢占いの知恵と最新の心理学研究から、あなたの夢が暗示する驚くべき真実を解説します。",
+                        "「{$title}」の夢を見たことがありますか？この夢に隠された10のシンボルとその意味を知れば、あなたの人生に大きな変化をもたらすかもしれません。",
+                        "夢に出てくる「{$title}」には、あなたが知らない驚くべき意味があります。夢占いの専門家が教える、この夢が示す潜在意識からのメッセージと、あなたの人生への影響を探ります。"
+                    ];
+                    
+                    $improvedDescription = $descriptionTemplates[array_rand($descriptionTemplates)];
+                    
                     // 140文字に制限
                     if (mb_strlen($improvedDescription) > 140) {
                         $improvedDescription = mb_substr($improvedDescription, 0, 137) . '...';
                     }
-                    error_log("Description was not changed, creating new one");
+                    error_log("Description was not changed, creating high-quality alternative");
                 } else {
                     $improvedDescription = $extractedDesc;
                     error_log("Extracted improved description: " . substr($improvedDescription, 0, 50));
                 }
             } else {
-                // プレースホルダーのままの場合、元のディスクリプションを改善
-                $improvedDescription = "夢占いで「" . $title . "」の意味を詳しく解説します。夢の中に表れるシンボルの意味や心理状態、未来への影響について夢診断で分析します。";
+                // プレースホルダーのままの場合、高品質なメタディスクリプションを生成
+                // 複数のバリエーションからランダムに選択
+                $descriptionTemplates = [
+                    "あなたの見た「{$title}」に関する夢には、意外な心理的意味があるかもしれません。精神分析学に基づく7つの解釈と、あなたの夢が示す将来の暦社を揭示します。",
+                    "「{$title}」の夢は、あなたの潜在意識からの重要なメッセージかもしれません。夢占いの専門家が明かす、この夢に秘められた5つの真実と、あなたの人生への影響を探ります。",
+                    "夜に見た「{$title}」の夢は単なる偶然ではありません。古代から伝わる夢占いの知恵と最新の心理学研究から、あなたの夢が暗示する驚くべき真実を解説します。",
+                    "「{$title}」の夢を見たことがありますか？この夢に隠された10のシンボルとその意味を知れば、あなたの人生に大きな変化をもたらすかもしれません。夢診断の専門家が夢の真相を解説します。",
+                    "夢に出てくる「{$title}」には、あなたが知らない驚くべき意味があります。夢占いの専門家が教える、この夢が示す潜在意識からのメッセージと、あなたの人生への影響を探ります。"
+                ];
+                
+                $improvedDescription = $descriptionTemplates[array_rand($descriptionTemplates)];
+                
                 // 140文字に制限
                 if (mb_strlen($improvedDescription) > 140) {
                     $improvedDescription = mb_substr($improvedDescription, 0, 137) . '...';
                 }
-                error_log("Description placeholder detected, creating new description");
+                error_log("Description placeholder detected, creating high-quality description");
             }
         } else {
-            // ディスクリプションが見つからない場合、元のディスクリプションを改善
-            $improvedDescription = "夢占いで「" . $title . "」の意味を詳しく解説します。夢の中に表れるシンボルの意味や心理状態、未来への影響について夢診断で分析します。";
+            // ディスクリプションが見つからない場合、高品質なメタディスクリプションを生成
+            // 複数のバリエーションからランダムに選択
+            $descriptionTemplates = [
+                "あなたの見た「{$title}」に関する夢には、意外な心理的意味があるかもしれません。精神分析学に基づく7つの解釈と、あなたの夢が示す将来の暦社を揭示します。",
+                "「{$title}」の夢は、あなたの潜在意識からの重要なメッセージかもしれません。夢占いの専門家が明かす、この夢に秘められた5つの真実と、あなたの人生への影響を探ります。",
+                "夜に見た「{$title}」の夢は単なる偶然ではありません。古代から伝わる夢占いの知恵と最新の心理学研究から、あなたの夢が暗示する驚くべき真実を解説します。",
+                "「{$title}」の夢を見たことがありますか？この夢に隠された10のシンボルとその意味を知れば、あなたの人生に大きな変化をもたらすかもしれません。夢診断の専門家が夢の真相を解説します。",
+                "夢に出てくる「{$title}」には、あなたが知らない驚くべき意味があります。夢占いの専門家が教える、この夢が示す潜在意識からのメッセージと、あなたの人生への影響を探ります。"
+            ];
+            
+            $improvedDescription = $descriptionTemplates[array_rand($descriptionTemplates)];
+            
             // 140文字に制限
             if (mb_strlen($improvedDescription) > 140) {
                 $improvedDescription = mb_substr($improvedDescription, 0, 137) . '...';
             }
-            error_log("No description found in response, creating new description");
+            error_log("No description found in response, creating high-quality description");
         }
         
         // 本文の抽出
@@ -730,140 +768,136 @@ function getOriginalArticle($sheetData, $url) {
         if ($row[0] === $url) {
             error_log("Found URL match at row index: " . $rowIndex);
             
-            // まずスプレッドシートのデータを確認
-            if (isset($row[5]) && !empty($row[5])) {
-                error_log("Using existing content from spreadsheet");
-                $originalContent = $row[5];
+            // スプレッドシートの列構造
+            // A列（$row[0]）：URL
+            // B列（$row[1]）：クリック数
+            // C列（$row[2]）：表示回数
+            // D列（$row[3]）：CTR
+            // E列（$row[4]）：掲載順位数
+            // F列（$row[5]）：空欄
+            
+            // 元記事、タイトル、ディスクリプションはすべてURLから取得する必要がある
+            error_log("Fetching article content from URL: " . $url);
+            
+            $title = '';
+            $description = '';
+            $content = '';
+            
+            try {
+                // cURLを使用してURLからコンテンツを取得
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // リダイレクトを追跡
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ
+                curl_setopt($ch, CURLOPT_TIMEOUT, 15); // タイムアウト設定を短く
+                curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'); // User-Agentを設定
+                $originalContent = curl_exec($ch);
                 
-                // 既存データから記事情報を抽出
-                $title = isset($row[3]) && !empty($row[3]) ? $row[3] : '';
-                $description = isset($row[4]) && !empty($row[4]) ? $row[4] : '';
-                $content = $originalContent;
-                
-                error_log("Using existing title and description from spreadsheet");
-            } else {
-                // URLから直接記事データを取得する
-                error_log("Fetching article content from URL: " . $url);
-                
-                try {
-                    // cURLを使用してURLからコンテンツを取得
-                    $ch = curl_init();
-                    curl_setopt($ch, CURLOPT_URL, $url);
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // リダイレクトを追跡
-                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 15); // タイムアウト設定を短く
-                    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'); // User-Agentを設定
-                    $originalContent = curl_exec($ch);
-                    
-                    if (curl_errno($ch)) {
-                        error_log("cURL error: " . curl_error($ch));
-                        throw new Exception("Failed to fetch content from URL");
-                    }
-                    
-                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    curl_close($ch);
-                    
-                    if ($httpCode != 200) {
-                        error_log("HTTP error: " . $httpCode);
-                        throw new Exception("HTTP error: " . $httpCode);
-                    }
-                    
-                    // DOMを使用して特定の要素を抽出
-                    $dom = new DOMDocument();
-                    @$dom->loadHTML(mb_convert_encoding($originalContent, 'HTML-ENTITIES', 'UTF-8'));
-                    $xpath = new DOMXPath($dom);
-                    
-                    // 記事タイトルをh1.article_titleから取得
-                    $title = '';
-                    $titleNodes = $xpath->query('//h1[contains(@class, "article_title")]');
-                    if ($titleNodes->length > 0) {
-                        $title = trim($titleNodes->item(0)->textContent);
-                        error_log("Extracted title from h1.article_title: " . $title);
-                    }
-                    
-                    // 記事本文を.article_bodyから取得し、本文のみを抽出
-                    $content = '';
-                    $bodyNodes = $xpath->query('//*[contains(@class, "article_body")]');
-                    if ($bodyNodes->length > 0) {
-                        $bodyNode = $bodyNodes->item(0);
-                        // 記事本文のみを抽出するために、内部HTMLだけを取得
-                        $innerContent = '';
-                        foreach ($bodyNode->childNodes as $childNode) {
-                            $innerContent .= $dom->saveHTML($childNode);
-                        }
-                        $content = $innerContent;
-                        error_log("Extracted content from .article_body (inner content only), length: " . strlen($content));
-                    }
-                    
-                    // タイトルが見つからない場合はtitleタグから取得
-                    if (empty($title)) {
-                        $titleTags = $xpath->query('//title');
-                        if ($titleTags->length > 0) {
-                            $title = trim($titleTags->item(0)->textContent);
-                            error_log("Falling back to title tag: " . $title);
-                        }
-                    }
-                    
-                    // 本文が見つからない場合はbodyタグ全体を使用
-                    if (empty($content)) {
-                        $bodyTags = $xpath->query('//body');
-                        if ($bodyTags->length > 0) {
-                            $content = $dom->saveHTML($bodyTags->item(0));
-                            error_log("Falling back to body tag content, length: " . strlen($content));
-                        } else {
-                            $content = $originalContent;
-                            error_log("Using full HTML as content");
-                        }
-                    }
-                    
-                    // メタディスクリプションを取得する方法を改善
-                    $description = '';
-                    
-                    // 方法１：meta[name="description"]から取得
-                    $metaNodes = $xpath->query('//meta[@name="description"]');
-                    if ($metaNodes->length > 0) {
-                        $metaNode = $metaNodes->item(0);
-                        if ($metaNode instanceof DOMElement) {
-                            $description = $metaNode->getAttribute('content');
-                            error_log("Extracted meta description from meta tag: " . $description);
-                        }
-                    }
-                    
-                    // 方法２：meta[property="og:description"]から取得
-                    if (empty($description)) {
-                        $ogDescNodes = $xpath->query('//meta[@property="og:description"]');
-                        if ($ogDescNodes->length > 0) {
-                            $ogDescNode = $ogDescNodes->item(0);
-                            if ($ogDescNode instanceof DOMElement) {
-                                $description = $ogDescNode->getAttribute('content');
-                                error_log("Extracted meta description from og:description: " . $description);
-                            }
-                        }
-                    }
-                    
-                    // 方法３：記事の最初の段落から生成
-                    if (empty($description) || $description === $title) {
-                        $paragraphs = $xpath->query('//div[contains(@class, "article_body")]//p');
-                        if ($paragraphs->length > 0) {
-                            $firstPara = $paragraphs->item(0)->textContent;
-                            if (strlen($firstPara) > 10) { // 最低限の長さチェック
-                                $description = mb_substr(trim($firstPara), 0, 120, 'UTF-8');
-                                if (strlen($firstPara) > 120) {
-                                    $description .= '...';
-                                }
-                                error_log("Generated description from first paragraph: " . $description);
-                            }
-                        }
-                    }
-                    
-                } catch (Exception $e) {
-                    error_log("Error fetching article: " . $e->getMessage());
-                    // エラーの場合はダミーコンテンツを使用
-                    $title = "記事取得エラー";
-                    $description = "URL: {$url} からの記事取得に失敗しました。";
-                    $content = "<h1>記事取得エラー</h1><p>URL: {$url}</p>";
+                if (curl_errno($ch)) {
+                    error_log("cURL error: " . curl_error($ch));
+                    throw new Exception("Failed to fetch content from URL");
                 }
+                
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                
+                if ($httpCode != 200) {
+                    error_log("HTTP error: " . $httpCode);
+                    throw new Exception("HTTP error: " . $httpCode);
+                }
+                
+                // DOMを使用して特定の要素を抽出
+                $dom = new DOMDocument();
+                @$dom->loadHTML(mb_convert_encoding($originalContent, 'HTML-ENTITIES', 'UTF-8'));
+                $xpath = new DOMXPath($dom);
+                
+                // 記事タイトルをh1.article_titleから取得
+                $titleNodes = $xpath->query('//h1[contains(@class, "article_title")]');
+                if ($titleNodes->length > 0) {
+                    $title = trim($titleNodes->item(0)->textContent);
+                    error_log("Extracted title from h1.article_title: " . $title);
+                }
+                
+                // 記事本文を.article_bodyから取得し、本文のみを抽出
+                $bodyNodes = $xpath->query('//*[contains(@class, "article_body")]');
+                if ($bodyNodes->length > 0) {
+                    $bodyNode = $bodyNodes->item(0);
+                    // 記事本文のみを抽出するために、内部HTMLだけを取得
+                    $innerContent = '';
+                    foreach ($bodyNode->childNodes as $childNode) {
+                        $innerContent .= $dom->saveHTML($childNode);
+                    }
+                    $content = $innerContent;
+                    error_log("Extracted content from .article_body (inner content only), length: " . strlen($content));
+                }
+                
+                // タイトルが見つからない場合はtitleタグから取得
+                if (empty($title)) {
+                    $titleTags = $xpath->query('//title');
+                    if ($titleTags->length > 0) {
+                        $title = trim($titleTags->item(0)->textContent);
+                        error_log("Falling back to title tag: " . $title);
+                    }
+                }
+                
+                // 本文が見つからない場合はbodyタグ全体を使用
+                if (empty($content)) {
+                    $bodyTags = $xpath->query('//body');
+                    if ($bodyTags->length > 0) {
+                        $content = $dom->saveHTML($bodyTags->item(0));
+                        error_log("Falling back to body tag content, length: " . strlen($content));
+                    } else {
+                        $content = $originalContent;
+                        error_log("Using full HTML as content");
+                    }
+                }
+                
+                // メタディスクリプションを取得する方法を改善
+                
+                // 方法1：meta[name="description"]から取得
+                $metaNodes = $xpath->query('//meta[@name="description"]');
+                if ($metaNodes->length > 0) {
+                    $metaNode = $metaNodes->item(0);
+                    if ($metaNode instanceof DOMElement) {
+                        $description = $metaNode->getAttribute('content');
+                        error_log("Extracted meta description from meta tag: " . $description);
+                    }
+                }
+                
+                // 方法2：meta[property="og:description"]から取得
+                if (empty($description)) {
+                    $ogDescNodes = $xpath->query('//meta[@property="og:description"]');
+                    if ($ogDescNodes->length > 0) {
+                        $ogDescNode = $ogDescNodes->item(0);
+                        if ($ogDescNode instanceof DOMElement) {
+                            $description = $ogDescNode->getAttribute('content');
+                            error_log("Extracted meta description from og:description: " . $description);
+                        }
+                    }
+                }
+                
+                // 方法3：記事の最初の段落から生成
+                if (empty($description) || $description === $title) {
+                    $paragraphs = $xpath->query('//div[contains(@class, "article_body")]//p');
+                    if ($paragraphs->length > 0) {
+                        $firstPara = $paragraphs->item(0)->textContent;
+                        if (strlen($firstPara) > 10) { // 最低限の長さチェック
+                            $description = mb_substr(trim($firstPara), 0, 120, 'UTF-8');
+                            if (strlen($firstPara) > 120) {
+                                $description .= '...';
+                            }
+                            error_log("Generated description from first paragraph: " . $description);
+                        }
+                    }
+                }
+                
+            } catch (Exception $e) {
+                error_log("Error fetching article: " . $e->getMessage());
+                // エラーの場合はダミーコンテンツを使用
+                $title = "記事取得エラー";
+                $description = "URL: {$url} からの記事取得に失敗しました。";
+                $content = "<h1>記事取得エラー</h1><p>URL: {$url}</p>";
             }
             
             // タイトルが見つからない場合はURLから生成
@@ -1190,14 +1224,25 @@ function convertMarkdownToHtml($markdown) {
  * @return array 解析された記事データ
  */
 function parseImprovedArticleData($jsonData) {
+    // デバッグ情報を出力
+    error_log("Parsing improved article data, first 100 chars: " . substr($jsonData, 0, 100));
+    
     $data = json_decode($jsonData, true);
     
     if (is_array($data) && isset($data['title']) && isset($data['description']) && isset($data['content'])) {
+        error_log("JSON data successfully parsed with title, description, and content");
         // 本文がマークダウン形式の場合はHTMLに変換
         if (isset($data['content'])) {
             $data['content'] = convertMarkdownToHtml($data['content']);
+            // ```html ```タグを削除する
+            $data['content'] = preg_replace('/^```html\s*|\s*```$/s', '', $data['content']);
         }
         return $data;
+    }
+    
+    // JSONデコードに失敗した場合のデバッグ情報
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log("JSON decode error: " . json_last_error_msg());
     }
     
     // JSONでない場合は文字列から解析を試みる
@@ -1207,10 +1252,23 @@ function parseImprovedArticleData($jsonData) {
     
     if (preg_match('/タイトル:\s*(.+?)(?=\nメタディスクリプション:|$)/s', $jsonData, $titleMatches)) {
         $title = trim($titleMatches[1]);
+        // クリック率などの余分な情報を除去
+        // 括弧内の情報を削除
+        $title = preg_replace('/\s*\([^)]*\)\s*$/', '', $title);
+        // 「」や『』の外側にある余分な情報を削除
+        $title = preg_replace('/^.*?[「『]([^」』]*)[」』].*$/', '\1', $title);
+        // 「」や『』がない場合はそのまま使用
+        if (!preg_match('/[「『」』]/', $title)) {
+            $title = preg_replace('/\s*[:|\-]\s*.*$/', '', $title);
+        }
     }
     
     if (preg_match('/メタディスクリプション:\s*(.+?)(?=\n本文:|$)/s', $jsonData, $descMatches)) {
         $description = trim($descMatches[1]);
+        // 括弧内の余分な情報を削除
+        $description = preg_replace('/\s*\([^)]*\)\s*$/', '', $description);
+        // コロンやダッシュ以降の余分な情報を削除
+        $description = preg_replace('/\s*[:|\-]\s*.*$/', '', $description);
     }
     
     if (preg_match('/本文:\s*(.+?)$/s', $jsonData, $bodyMatches)) {
@@ -1232,6 +1290,9 @@ function parseImprovedArticleData($jsonData) {
         
         // マークダウンからHTMLに変換
         $content = convertMarkdownToHtml($content);
+        
+        // ```html ```タグを削除する
+        $content = preg_replace('/^```html\s*|\s*```$/s', '', $content);
     }
     
     return [

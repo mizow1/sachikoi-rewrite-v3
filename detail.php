@@ -53,7 +53,9 @@ $latestRewrite = !empty($rewriteHistory) ? $rewriteHistory[count($rewriteHistory
 // 最新の改善された記事データを解析
 $latestImprovedData = null;
 if ($latestRewrite) {
+    // 改善された記事データを解析し、デバッグ情報を記録
     $latestImprovedData = parseImprovedArticleData($latestRewrite['improved']);
+    error_log("Latest improved data: " . json_encode($latestImprovedData));
 }
 
 // ページタイトル
@@ -109,31 +111,39 @@ $pageTitle = "記事詳細: " . htmlspecialchars($url);
                         </div>
                     </div>
 
-                    <?php if ($latestImprovedData): ?>
+                    <?php if ($latestRewrite): ?>
                         <div class="improved-article">
                             <h3>最新の改善記事</h3>
-                            <div class="article-meta">
-                                <div class="meta-item">
-                                    <strong>タイトル:</strong>
-                                    <p><?php echo htmlspecialchars($latestImprovedData['title']); ?></p>
-                                </div>
-                                <div class="meta-item">
-                                    <strong>メタディスクリプション:</strong>
-                                    <p><?php echo htmlspecialchars($latestImprovedData['description']); ?></p>
-                                </div>
-                            </div>
-                            <div class="article-content">
-                                <strong>本文:</strong>
-                                <div class="content-preview">
-                                    <?php echo $latestImprovedData['content']; ?>
-                                </div>
-                            </div>
+                            
+                            <!-- 問題点を最初に表示 -->
                             <div class="article-issues">
                                 <strong>問題点:</strong>
                                 <div class="issues-content">
                                     <?php echo nl2br(htmlspecialchars($latestRewrite['issues'])); ?>
                                 </div>
                             </div>
+                            
+                            <?php if ($latestImprovedData): ?>
+                            <!-- タイトルとメタディスクリプション -->
+                            <div class="article-meta">
+                                <div class="meta-item">
+                                    <strong>タイトル:</strong>
+                                    <p><?php echo htmlspecialchars($latestImprovedData['title'] ?? ''); ?></p>
+                                </div>
+                                <div class="meta-item">
+                                    <strong>メタディスクリプション:</strong>
+                                    <p><?php echo htmlspecialchars($latestImprovedData['description'] ?? ''); ?></p>
+                                </div>
+                            </div>
+                            
+                            <!-- 本文 -->
+                            <div class="article-content">
+                                <strong>本文:</strong>
+                                <div class="content-preview">
+                                    <?php echo isset($latestImprovedData['content']) ? $latestImprovedData['content'] : ''; ?>
+                                </div>
+                            </div>
+                            <?php endif; ?>
                             <div class="article-datetime">
                                 <strong>リライト日時:</strong>
                                 <p><?php echo htmlspecialchars($latestRewrite['datetime']); ?></p>

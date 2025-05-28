@@ -305,10 +305,10 @@ function calculateRewriteCounts($sheetData) {
         $columnIndex = 5; // F列から開始（0ベースなので5）
         $count = 0;
         
-        // F列以降を3列ずつチェック（日時、タイトル、メタディスクリプション）
-        while (isset($row[$columnIndex]) && !empty($row[$columnIndex])) {
+        // F列以降を6列セットでチェック
+        while (isset($row[$columnIndex + 5]) && !empty($row[$columnIndex])) {
             $count++;
-            $columnIndex += 3;
+            $columnIndex += 6; // 6列セットなので6つ進める
         }
         
         $rewriteCounts[$url] = $count;

@@ -23,26 +23,28 @@ $rowIndex = null;
 foreach ($sheetData as $index => $row) {
     if ($row[0] === $url) {
         $rowIndex = $index;
-        
+
         // F列以降のデータを確認
         $columnIndex = 5; // F列から開始（0ベースなので5）
-        
-        // 元の記事、問題点、書き直し日時、書き直し後の記事のパターンを検出
-        while (isset($row[$columnIndex + 3])) { // 4列セットで確認
-            if (!empty($row[$columnIndex]) && !empty($row[$columnIndex + 1]) && 
-                !empty($row[$columnIndex + 2]) && !empty($row[$columnIndex + 3])) {
-                
+
+        // 6列セットでデータを処理
+        while (isset($row[$columnIndex + 5])) { // 6列セットで確認
+            if (!empty($row[$columnIndex])) {
                 // リライトデータを追加
+                // 必要なデータは列の位置に応じて取得
                 $rewriteHistory[] = [
                     'original' => $row[$columnIndex],
                     'issues' => $row[$columnIndex + 1],
                     'datetime' => $row[$columnIndex + 2],
                     'improved' => $row[$columnIndex + 3]
+                    // 残りの2列は現在使用していないが、必要に応じて追加可能
+                    // 'extra1' => $row[$columnIndex + 4],
+                    // 'extra2' => $row[$columnIndex + 5]
                 ];
             }
-            $columnIndex += 4; // 次の4列セットへ
+            $columnIndex += 6; // 次の6列セットへ
         }
-        
+
         break;
     }
 }
@@ -52,11 +54,108 @@ $latestRewrite = !empty($rewriteHistory) ? $rewriteHistory[count($rewriteHistory
 
 // 最新の改善された記事データを解析
 $latestImprovedData = null;
-if ($latestRewrite) {
-    // 改善された記事データを解析し、デバッグ情報を記録
-    $latestImprovedData = parseImprovedArticleData($latestRewrite['improved']);
-    error_log("Latest improved data: " . json_encode($latestImprovedData));
+
+// URLを手がかりにスプレッドシートから直接データを取得
+$originalTitle = '';
+$originalDescription = '';
+$improvedTitle = '';
+$improvedDescription = '';
+$improvedContent = '';
+
+// デバッグ用の配列
+$debugInfo = [];
+$debugInfo['row_data'] = [];
+
+// スプレッドシートのデータからURLに一致する行を探す
+foreach ($sheetData as $row) {
+    if ($row[0] === $url) {
+        // デバッグ用に行データを保存
+        $debugInfo['row_found'] = true;
+        $debugInfo['row_length'] = count($row);
+        
+        // 元の記事のタイトルとディスクリプションを取得
+        $originalTitle = isset($row[1]) ? $row[1] : '';
+        $originalDescription = isset($row[2]) ? $row[2] : '';
+        
+        // 最新の改善記事のデータを取得
+        // スプレッドシートの最後の列からデータを取得
+        $lastColumnIndex = count($row) - 1;
+        $debugInfo['last_column_index'] = $lastColumnIndex;
+        
+        // 最後から逆に探して、最新の改善記事のデータを取得
+        for ($i = $lastColumnIndex; $i >= 3; $i--) {
+            if (!empty($row[$i])) {
+                // デバッグ用に列データを保存
+                $debugInfo['row_data'][$i] = substr($row[$i], 0, 100) . (strlen($row[$i]) > 100 ? '...' : '');
+                
+                // データがプレーンテキストの場合の処理
+                // 最初の行をタイトルとして使用
+                $lines = explode("\n", $row[$i]);
+                if (empty($improvedTitle) && !empty($lines[0])) {
+                    $improvedTitle = trim($lines[0]);
+                    $debugInfo['title_from_line'] = true;
+                }
+                
+                // 改善記事のタイトル、ディスクリプション、本文を取得
+                if (empty($improvedTitle) && preg_match('/タイトル[\s]*[:：][\s]*([^\n\r]+)/u', $row[$i], $matches)) {
+                    $improvedTitle = trim($matches[1]);
+                    $debugInfo['title_from_regex'] = true;
+                }
+                if (empty($improvedDescription) && preg_match('/メタディスクリプション[\s]*[:：][\s]*([^\n\r]+)/u', $row[$i], $matches)) {
+                    $improvedDescription = trim($matches[1]);
+                    $debugInfo['description_from_regex'] = true;
+                }
+                if (empty($improvedContent) && preg_match('/本文[\s]*[:：][\s]*([\s\S]+)$/u', $row[$i], $matches)) {
+                    $improvedContent = trim($matches[1]);
+                    $debugInfo['content_from_regex'] = true;
+                }
+                
+                // ディスクリプションが取得できない場合、元のディスクリプションを使用
+                if (empty($improvedDescription) && !empty($originalDescription)) {
+                    $improvedDescription = $originalDescription;
+                    $debugInfo['description_from_original'] = true;
+                }
+                
+                // 本文が取得できない場合、生データを使用
+                if (empty($improvedContent) && !empty($row[$i])) {
+                    // タイトル行を除いた内容を本文として使用
+                    if (count($lines) > 1) {
+                        array_shift($lines); // 最初の行（タイトル）を除去
+                        $improvedContent = trim(implode("\n", $lines));
+                        $debugInfo['content_from_lines'] = true;
+                    } else {
+                        $improvedContent = $row[$i];
+                        $debugInfo['content_from_raw'] = true;
+                    }
+                }
+                
+                // 全てのデータが取得できたらループを終了
+                if (!empty($improvedTitle) && !empty($improvedDescription) && !empty($improvedContent)) {
+                    $debugInfo['all_data_found'] = true;
+                    break;
+                }
+            }
+        }
+        
+        break; // URLが一致した行が見つかったらループを終了
+    }
 }
+
+// デバッグ情報を記録
+error_log("Debug info: " . json_encode($debugInfo));
+
+// 取得したデータをlatestImprovedDataに設定
+$latestImprovedData = [
+    'title' => !empty($improvedTitle) ? $improvedTitle : 'タイトルが取得できませんでした',
+    'description' => !empty($improvedDescription) ? $improvedDescription : 'メタディスクリプションが取得できませんでした',
+    'content' => !empty($improvedContent) ? $improvedContent : '本文が取得できませんでした'
+];
+
+// デバッグ情報を記録
+if ($latestRewrite) {
+    error_log("Latest improved data raw: " . substr($latestRewrite['improved'], 0, 500));
+}
+error_log("Latest improved data from sheet: " . json_encode($latestImprovedData));
 
 // ページタイトル
 $pageTitle = "記事詳細: " . htmlspecialchars($url);
@@ -64,6 +163,7 @@ $pageTitle = "記事詳細: " . htmlspecialchars($url);
 
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -71,6 +171,7 @@ $pageTitle = "記事詳細: " . htmlspecialchars($url);
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -109,41 +210,139 @@ $pageTitle = "記事詳細: " . htmlspecialchars($url);
                                 <?php echo $originalArticle['content']; ?>
                             </div>
                         </div>
+                        <div class="article-issues">
+                            <h3>問題点</h3>
+                            <div class="issues-content">
+                                <?php echo nl2br(htmlspecialchars($latestRewrite['issues'])); ?>
+                            </div>
+                        </div>
+
                     </div>
 
                     <?php if ($latestRewrite): ?>
+
                         <div class="improved-article">
                             <h3>最新の改善記事</h3>
-                            
-                            <!-- 問題点を最初に表示 -->
-                            <div class="article-issues">
-                                <strong>問題点:</strong>
-                                <div class="issues-content">
-                                    <?php echo nl2br(htmlspecialchars($latestRewrite['issues'])); ?>
-                                </div>
+
+                            <!-- デバッグ情報表示 -->
+                            <div class="debug-data" style="background-color: #f5f5f5; padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; font-size: 12px;">
+                                <strong>データ取得状況:</strong>
+                                <ul>
+                                    <li>タイトル: <?php echo !empty($improvedTitle) ? '取得成功' : '取得失敗'; ?></li>
+                                    <li>メタディスクリプション: <?php echo !empty($improvedDescription) ? '取得成功' : '取得失敗'; ?></li>
+                                    <li>本文: <?php echo !empty($improvedContent) ? '取得成功' : '取得失敗'; ?></li>
+                                </ul>
+                                
+                                <strong>デバッグ情報詳細:</strong>
+                                <ul>
+                                    <li>行見つかった: <?php echo isset($debugInfo['row_found']) ? 'Yes' : 'No'; ?></li>
+                                    <li>行の長さ: <?php echo isset($debugInfo['row_length']) ? $debugInfo['row_length'] : 'N/A'; ?></li>
+                                    <li>最後の列インデックス: <?php echo isset($debugInfo['last_column_index']) ? $debugInfo['last_column_index'] : 'N/A'; ?></li>
+                                    <li>タイトル取得方法: 
+                                        <?php 
+                                        if (isset($debugInfo['title_from_line'])) echo '行から取得'; 
+                                        elseif (isset($debugInfo['title_from_regex'])) echo '正規表現から取得'; 
+                                        else echo '取得失敗';
+                                        ?>
+                                    </li>
+                                    <li>ディスクリプション取得方法: 
+                                        <?php 
+                                        if (isset($debugInfo['description_from_regex'])) echo '正規表現から取得'; 
+                                        elseif (isset($debugInfo['description_from_original'])) echo '元のディスクリプションから取得'; 
+                                        else echo '取得失敗';
+                                        ?>
+                                    </li>
+                                    <li>本文取得方法: 
+                                        <?php 
+                                        if (isset($debugInfo['content_from_regex'])) echo '正規表現から取得'; 
+                                        elseif (isset($debugInfo['content_from_lines'])) echo '行から取得'; 
+                                        elseif (isset($debugInfo['content_from_raw'])) echo '生データから取得'; 
+                                        else echo '取得失敗';
+                                        ?>
+                                    </li>
+                                    <li>全データ取得: <?php echo isset($debugInfo['all_data_found']) ? 'Yes' : 'No'; ?></li>
+                                </ul>
+                                
+                                <strong>スプレッドシートデータプレビュー:</strong>
+                                <ul>
+                                <?php foreach ($debugInfo['row_data'] as $index => $data): ?>
+                                    <li>列<?php echo $index; ?>: <?php echo htmlspecialchars($data); ?></li>
+                                <?php endforeach; ?>
+                                </ul>
+                                
+                                <?php if ($latestRewrite): ?>
+                                <strong>生データプレビュー（最初の500文字）:</strong>
+                                <pre style="white-space: pre-wrap; word-break: break-all;"><?php echo htmlspecialchars(substr($latestRewrite['improved'], 0, 500)); ?></pre>
+                                <?php endif; ?>
                             </div>
-                            
-                            <?php if ($latestImprovedData): ?>
+
                             <!-- タイトルとメタディスクリプション -->
                             <div class="article-meta">
                                 <div class="meta-item">
                                     <strong>タイトル:</strong>
-                                    <p><?php echo htmlspecialchars($latestImprovedData['title'] ?? ''); ?></p>
+                                    <p>
+                                    <?php 
+                                        // 生のデータを確認
+                                        $rawImproved = $latestRewrite['improved'];
+                                        
+                                        // データがシンプルなテキストの場合、最初の行をタイトルとして使用
+                                        $lines = explode("\n", $rawImproved);
+                                        if (!empty($lines[0])) {
+                                            echo htmlspecialchars(trim($lines[0]));
+                                        } else {
+                                            echo 'タイトルが見つかりませんでした';
+                                        }
+                                    ?>
+                                    </p>
                                 </div>
                                 <div class="meta-item">
                                     <strong>メタディスクリプション:</strong>
-                                    <p><?php echo htmlspecialchars($latestImprovedData['description'] ?? ''); ?></p>
+                                    <p>
+                                    <?php 
+                                        // データからメタディスクリプションを取得
+                                        if (count($lines) > 1) {
+                                            // 2行目があれば、それをメタディスクリプションとして使用
+                                            echo htmlspecialchars(trim($lines[1]));
+                                        } elseif (isset($latestImprovedData['description']) && !empty($latestImprovedData['description'])) {
+                                            // parseImprovedArticleData関数からのデータがあれば使用
+                                            echo htmlspecialchars($latestImprovedData['description']);
+                                        } else {
+                                            // データがない場合はその旨を表示
+                                            echo 'メタディスクリプションが見つかりませんでした';
+                                        }
+                                    ?>
+                                    </p>
                                 </div>
                             </div>
-                            
+
                             <!-- 本文 -->
                             <div class="article-content">
                                 <strong>本文:</strong>
                                 <div class="content-preview">
-                                    <?php echo isset($latestImprovedData['content']) ? $latestImprovedData['content'] : ''; ?>
+                                <?php 
+                                    // データがシンプルなテキストの場合、生のデータをそのまま使用
+                                    if (!empty($rawImproved)) {
+                                        // タイトル行を除いた本文を表示
+                                        $contentLines = $lines;
+                                        if (count($contentLines) > 0) {
+                                            // 最初の行（タイトル）を除去
+                                            array_shift($contentLines);
+                                        }
+                                        
+                                        // 本文が空でない場合のみ表示
+                                        if (!empty($contentLines)) {
+                                            echo nl2br(htmlspecialchars(implode("\n", $contentLines)));
+                                        } else {
+                                            // 本文が空の場合は生データをそのまま表示
+                                            echo nl2br(htmlspecialchars($rawImproved));
+                                        }
+                                    } else {
+                                        echo '本文が見つかりませんでした';
+                                    }
+                                ?>
                                 </div>
                             </div>
-                            <?php endif; ?>
+
                             <div class="article-datetime">
                                 <strong>リライト日時:</strong>
                                 <p><?php echo htmlspecialchars($latestRewrite['datetime']); ?></p>
@@ -157,7 +356,8 @@ $pageTitle = "記事詳細: " . htmlspecialchars($url);
                         <h3>リライト履歴</h3>
                         <div class="history-timeline">
                             <?php foreach (array_reverse($rewriteHistory) as $index => $rewrite): ?>
-                                <?php if ($index > 0): // 最新のリライトは既に表示しているのでスキップ ?>
+                                <?php if ($index > 0): // 最新のリライトは既に表示しているのでスキップ 
+                                ?>
                                     <?php $improvedData = parseImprovedArticleData($rewrite['improved']); ?>
                                     <div class="history-item">
                                         <div class="history-datetime">
@@ -208,4 +408,5 @@ $pageTitle = "記事詳細: " . htmlspecialchars($url);
 
     <script src="js/script.js"></script>
 </body>
+
 </html>

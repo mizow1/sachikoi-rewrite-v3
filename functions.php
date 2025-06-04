@@ -177,7 +177,7 @@ function getAccessToken($serviceAccountJson) {
         
         if ($httpCode != 200) {
             error_log("Failed to get access token. HTTP code: " . $httpCode);
-            error_log("Response: " . $response);
+            error_log("Response: " . substr($response, 0, 1000));
             return null;
         }
         
@@ -323,24 +323,73 @@ function calculateRewriteCounts($sheetData) {
  * @param array $sheetData スプレッドシートのデータ
  * @param string $keyword 検索キーワード（オプション）
  * @param string $sortBy ソート条件（オプション）
+ * @param array $filters 数値フィルタ条件（オプション）
  * @return array フィルタリングとソートされたURLリスト
  */
-function getFilteredUrls($sheetData, $keyword = '', $sortBy = 'impressions_desc') {
+function getFilteredUrls($sheetData, $keyword = '', $sortBy = 'impressions_desc', $filters = []) {
     // リライト回数を計算
     $rewriteCounts = calculateRewriteCounts($sheetData);
     
-    // キーワードでフィルタリング
+    // キーワードと数値フィルタでフィルタリング
     $filteredUrls = [];
     foreach ($sheetData as $row) {
         $url = $row[0];
+        $clicks = isset($row[1]) ? (int)$row[1] : 0;
+        $impressions = isset($row[2]) ? (int)$row[2] : 0;
+        $ctr = isset($row[3]) ? (float)str_replace('%', '', $row[3]) : 0;
+        $position = isset($row[4]) ? (float)$row[4] : 0;
+        $rewriteCount = isset($rewriteCounts[$url]) ? $rewriteCounts[$url] : 0;
         
         // キーワードが指定されている場合、URLに含まれているかチェック
         if (!empty($keyword) && stripos($url, $keyword) === false) {
             continue;
         }
         
+        // 数値フィルタのチェック
+        if (!empty($filters)) {
+            // 表示回数のフィルタ
+            if (isset($filters['impressions_min']) && $filters['impressions_min'] !== null && $impressions < $filters['impressions_min']) {
+                continue;
+            }
+            if (isset($filters['impressions_max']) && $filters['impressions_max'] !== null && $impressions > $filters['impressions_max']) {
+                continue;
+            }
+            
+            // クリック数のフィルタ
+            if (isset($filters['clicks_min']) && $filters['clicks_min'] !== null && $clicks < $filters['clicks_min']) {
+                continue;
+            }
+            if (isset($filters['clicks_max']) && $filters['clicks_max'] !== null && $clicks > $filters['clicks_max']) {
+                continue;
+            }
+            
+            // CTRのフィルタ
+            if (isset($filters['ctr_min']) && $filters['ctr_min'] !== null && $ctr < $filters['ctr_min']) {
+                continue;
+            }
+            if (isset($filters['ctr_max']) && $filters['ctr_max'] !== null && $ctr > $filters['ctr_max']) {
+                continue;
+            }
+            
+            // 平均掲載順位のフィルタ
+            if (isset($filters['position_min']) && $filters['position_min'] !== null && $position < $filters['position_min']) {
+                continue;
+            }
+            if (isset($filters['position_max']) && $filters['position_max'] !== null && $position > $filters['position_max']) {
+                continue;
+            }
+            
+            // リライト回数のフィルタ
+            if (isset($filters['rewrite_min']) && $filters['rewrite_min'] !== null && $rewriteCount < $filters['rewrite_min']) {
+                continue;
+            }
+            if (isset($filters['rewrite_max']) && $filters['rewrite_max'] !== null && $rewriteCount > $filters['rewrite_max']) {
+                continue;
+            }
+        }
+        
         // リライト回数を追加
-        $row[] = isset($rewriteCounts[$url]) ? $rewriteCounts[$url] : 0;
+        $row[] = $rewriteCount;
         $filteredUrls[] = $row;
     }
     
@@ -352,6 +401,8 @@ function getFilteredUrls($sheetData, $keyword = '', $sortBy = 'impressions_desc'
         $clicksB = isset($b[1]) ? (int)$b[1] : 0;
         $impressionsA = isset($a[2]) ? (int)$a[2] : 0;
         $impressionsB = isset($b[2]) ? (int)$b[2] : 0;
+        $ctrA = isset($a[3]) ? (float)str_replace('%', '', $a[3]) : 0;
+        $ctrB = isset($b[3]) ? (float)str_replace('%', '', $b[3]) : 0;
         $positionA = isset($a[4]) ? (float)$a[4] : 0;
         $positionB = isset($b[4]) ? (float)$b[4] : 0;
         $rewriteCountA = isset($a[count($a)-1]) ? (int)$a[count($a)-1] : 0;
@@ -366,10 +417,14 @@ function getFilteredUrls($sheetData, $keyword = '', $sortBy = 'impressions_desc'
                 return $clicksA - $clicksB;
             case 'clicks_desc':
                 return $clicksB - $clicksA;
+            case 'ctr_asc':
+                return $ctrA <=> $ctrB;
+            case 'ctr_desc':
+                return $ctrB <=> $ctrA;
             case 'position_asc':
-                return $positionA - $positionB;
+                return $positionA <=> $positionB;
             case 'position_desc':
-                return $positionB - $positionA;
+                return $positionB <=> $positionA;
             case 'rewrite_count_asc':
                 return $rewriteCountA - $rewriteCountB;
             case 'rewrite_count_desc':
@@ -497,10 +552,6 @@ function improveArticle($title, $description, $content, $issues) {
     
     // メモリ制限を緩和
     ini_set('memory_limit', '512M');
-    
-    // タイムアウトを防ぐための設定
-    ini_set('max_execution_time', 300);
-    ini_set('default_socket_timeout', 300);
     
     try {
         // OpenAI APIのモデルとエンドポイント

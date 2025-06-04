@@ -20,12 +20,36 @@ $debugInfo['データ取得結果'] = [
     'シートデータ取得' => !empty($sheetData) ? '成功 (' . count($sheetData) . '行)' : '失敗'
 ];
 
-// キーワードとソート条件を取得
+// フィルタ条件を取得
 $keyword = isset($_GET['keyword']) ? $_GET['keyword'] : '';
-$sortBy = isset($_GET['sort']) ? $_GET['sort'] : 'impressions_asc';
+$sortBy = isset($_GET['sort']) ? $_GET['sort'] : 'impressions';
+$sortOrder = isset($_GET['order']) ? $_GET['order'] : 'asc';
+
+// 数値フィルタ条件
+$impressionsMin = isset($_GET['impressions_min']) && $_GET['impressions_min'] !== '' ? (int)$_GET['impressions_min'] : null;
+$impressionsMax = isset($_GET['impressions_max']) && $_GET['impressions_max'] !== '' ? (int)$_GET['impressions_max'] : null;
+$clicksMin = isset($_GET['clicks_min']) && $_GET['clicks_min'] !== '' ? (int)$_GET['clicks_min'] : null;
+$clicksMax = isset($_GET['clicks_max']) && $_GET['clicks_max'] !== '' ? (int)$_GET['clicks_max'] : null;
+$ctrMin = isset($_GET['ctr_min']) && $_GET['ctr_min'] !== '' ? (float)$_GET['ctr_min'] : null;
+$ctrMax = isset($_GET['ctr_max']) && $_GET['ctr_max'] !== '' ? (float)$_GET['ctr_max'] : null;
+$positionMin = isset($_GET['position_min']) && $_GET['position_min'] !== '' ? (float)$_GET['position_min'] : null;
+$positionMax = isset($_GET['position_max']) && $_GET['position_max'] !== '' ? (float)$_GET['position_max'] : null;
+$rewriteMin = isset($_GET['rewrite_min']) && $_GET['rewrite_min'] !== '' ? (int)$_GET['rewrite_min'] : null;
+$rewriteMax = isset($_GET['rewrite_max']) && $_GET['rewrite_max'] !== '' ? (int)$_GET['rewrite_max'] : null;
 
 // フィルタリングされたURLリストを取得
-$filteredUrls = getFilteredUrls($sheetData, $keyword, $sortBy);
+$filteredUrls = getFilteredUrls($sheetData, $keyword, $sortBy . '_' . $sortOrder, [
+    'impressions_min' => $impressionsMin,
+    'impressions_max' => $impressionsMax,
+    'clicks_min' => $clicksMin,
+    'clicks_max' => $clicksMax,
+    'ctr_min' => $ctrMin,
+    'ctr_max' => $ctrMax,
+    'position_min' => $positionMin,
+    'position_max' => $positionMax,
+    'rewrite_min' => $rewriteMin,
+    'rewrite_max' => $rewriteMax,
+]);
 $debugInfo['データ取得結果']['フィルタリング後'] = !empty($filteredUrls) ? '成功 (' . count($filteredUrls) . '行)' : '失敗';
 
 // リライト回数を計算
@@ -44,6 +68,62 @@ $pageTitle = "記事リライトツール";
     <title><?php echo $pageTitle; ?></title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .sortable-header {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            padding-right: 20px;
+        }
+        .sortable-header:hover {
+            background-color: #f0f0f0;
+        }
+        .sort-icon {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 12px;
+            opacity: 0.5;
+        }
+        .sort-icon.active {
+            opacity: 1;
+        }
+        .filter-section {
+            background: #f9f9f9;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .filter-group label {
+            font-weight: bold;
+            min-width: 80px;
+        }
+        .filter-group input[type="number"] {
+            width: 80px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -84,31 +164,73 @@ $pageTitle = "記事リライトツール";
                 </div>
             </div>
             <?php endif; ?>
+            
+            <form id="filterForm" method="get">
+                <div class="filter-section">
+                    <h3>フィルタ条件</h3>
+                    
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="keyword">キーワード:</label>
+                            <input type="text" id="keyword" name="keyword" value="<?php echo htmlspecialchars($keyword); ?>" placeholder="URLで検索">
+                        </div>
+                    </div>
+                    
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label>表示回数:</label>
+                            <input type="number" name="impressions_min" value="<?php echo $impressionsMin !== null ? $impressionsMin : ''; ?>" placeholder="最小値">
+                            <span>〜</span>
+                            <input type="number" name="impressions_max" value="<?php echo $impressionsMax !== null ? $impressionsMax : ''; ?>" placeholder="最大値">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label>クリック数:</label>
+                            <input type="number" name="clicks_min" value="<?php echo $clicksMin !== null ? $clicksMin : ''; ?>" placeholder="最小値">
+                            <span>〜</span>
+                            <input type="number" name="clicks_max" value="<?php echo $clicksMax !== null ? $clicksMax : ''; ?>" placeholder="最大値">
+                        </div>
+                    </div>
+                    
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label>CTR(%):</label>
+                            <input type="number" step="0.01" name="ctr_min" value="<?php echo $ctrMin !== null ? $ctrMin : ''; ?>" placeholder="最小値">
+                            <span>〜</span>
+                            <input type="number" step="0.01" name="ctr_max" value="<?php echo $ctrMax !== null ? $ctrMax : ''; ?>" placeholder="最大値">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label>平均掲載順位:</label>
+                            <input type="number" step="0.1" name="position_min" value="<?php echo $positionMin !== null ? $positionMin : ''; ?>" placeholder="最小値">
+                            <span>〜</span>
+                            <input type="number" step="0.1" name="position_max" value="<?php echo $positionMax !== null ? $positionMax : ''; ?>" placeholder="最大値">
+                        </div>
+                    </div>
+                    
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label>リライト回数:</label>
+                            <input type="number" name="rewrite_min" value="<?php echo $rewriteMin !== null ? $rewriteMin : ''; ?>" placeholder="最小値">
+                            <span>〜</span>
+                            <input type="number" name="rewrite_max" value="<?php echo $rewriteMax !== null ? $rewriteMax : ''; ?>" placeholder="最大値">
+                        </div>
+                    </div>
+                    
+                    <div class="filter-buttons">
+                        <button type="submit" class="btn btn-primary">フィルタ適用</button>
+                        <button type="button" id="clearFilter" class="btn btn-secondary">クリア</button>
+                    </div>
+                </div>
+                
+                <!-- 隠しフィールドでソート情報を保持 -->
+                <input type="hidden" name="sort" value="<?php echo htmlspecialchars($sortBy); ?>">
+                <input type="hidden" name="order" value="<?php echo htmlspecialchars($sortOrder); ?>">
+            </form>
+
             <form id="rewriteForm" action="process.php" method="post">
                 <div class="control-panel">
                     <button type="submit" class="btn btn-primary">選択した記事をリライト</button>
-                    <div class="filter-controls">
-                        <div class="filter-item">
-                            <label for="keyword">キーワード検索:</label>
-                            <input type="text" id="keyword" name="keyword" value="<?php echo htmlspecialchars($keyword); ?>" placeholder="URLで検索">
-                            <button type="button" id="searchBtn" class="btn btn-small">検索</button>
-                        </div>
-                        <div class="filter-item">
-                            <label for="sortBy">並び替え:</label>
-                            <select id="sortBy" name="sortBy">
-                                <option value="impressions_asc" <?php echo $sortBy === 'impressions_asc' ? 'selected' : ''; ?>>表示回数（少ない順）</option>
-                                <option value="impressions_desc" <?php echo $sortBy === 'impressions_desc' ? 'selected' : ''; ?>>表示回数（多い順）</option>
-                                <option value="clicks_asc" <?php echo $sortBy === 'clicks_asc' ? 'selected' : ''; ?>>クリック数（少ない順）</option>
-                                <option value="clicks_desc" <?php echo $sortBy === 'clicks_desc' ? 'selected' : ''; ?>>クリック数（多い順）</option>
-                                <option value="position_asc" <?php echo $sortBy === 'position_asc' ? 'selected' : ''; ?>>平均掲載順位（上位順）</option>
-                                <option value="position_desc" <?php echo $sortBy === 'position_desc' ? 'selected' : ''; ?>>平均掲載順位（下位順）</option>
-                                <option value="rewrite_count_asc" <?php echo $sortBy === 'rewrite_count_asc' ? 'selected' : ''; ?>>リライト回数（少ない順）</option>
-                                <option value="rewrite_count_desc" <?php echo $sortBy === 'rewrite_count_desc' ? 'selected' : ''; ?>>リライト回数（多い順）</option>
-                                <option value="url_asc" <?php echo $sortBy === 'url_asc' ? 'selected' : ''; ?>>URL（昇順）</option>
-                                <option value="url_desc" <?php echo $sortBy === 'url_desc' ? 'selected' : ''; ?>>URL（降順）</option>
-                            </select>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="url-list">
@@ -116,12 +238,30 @@ $pageTitle = "記事リライトツール";
                         <thead>
                             <tr>
                                 <th><input type="checkbox" id="selectAll"></th>
-                                <th>URL</th>
-                                <th>表示回数</th>
-                                <th>クリック数</th>
-                                <th>CTR</th>
-                                <th>平均掲載順位</th>
-                                <th>リライト回数</th>
+                                <th class="sortable-header" data-sort="url">
+                                    URL
+                                    <i class="sort-icon fas fa-sort<?php echo ($sortBy === 'url') ? ($sortOrder === 'asc' ? '-up active' : '-down active') : ''; ?>"></i>
+                                </th>
+                                <th class="sortable-header" data-sort="impressions">
+                                    表示回数
+                                    <i class="sort-icon fas fa-sort<?php echo ($sortBy === 'impressions') ? ($sortOrder === 'asc' ? '-up active' : '-down active') : ''; ?>"></i>
+                                </th>
+                                <th class="sortable-header" data-sort="clicks">
+                                    クリック数
+                                    <i class="sort-icon fas fa-sort<?php echo ($sortBy === 'clicks') ? ($sortOrder === 'asc' ? '-up active' : '-down active') : ''; ?>"></i>
+                                </th>
+                                <th class="sortable-header" data-sort="ctr">
+                                    CTR
+                                    <i class="sort-icon fas fa-sort<?php echo ($sortBy === 'ctr') ? ($sortOrder === 'asc' ? '-up active' : '-down active') : ''; ?>"></i>
+                                </th>
+                                <th class="sortable-header" data-sort="position">
+                                    平均掲載順位
+                                    <i class="sort-icon fas fa-sort<?php echo ($sortBy === 'position') ? ($sortOrder === 'asc' ? '-up active' : '-down active') : ''; ?>"></i>
+                                </th>
+                                <th class="sortable-header" data-sort="rewrite_count">
+                                    リライト回数
+                                    <i class="sort-icon fas fa-sort<?php echo ($sortBy === 'rewrite_count') ? ($sortOrder === 'asc' ? '-up active' : '-down active') : ''; ?>"></i>
+                                </th>
                                 <th>詳細</th>
                             </tr>
                         </thead>
@@ -158,6 +298,48 @@ $pageTitle = "記事リライトツール";
         </footer>
     </div>
 
+    <script>
+        // ソート機能
+        document.querySelectorAll('.sortable-header').forEach(header => {
+            header.addEventListener('click', function() {
+                const sortField = this.dataset.sort;
+                const currentSort = new URLSearchParams(window.location.search).get('sort');
+                const currentOrder = new URLSearchParams(window.location.search).get('order') || 'asc';
+                
+                let newOrder = 'asc';
+                if (currentSort === sortField && currentOrder === 'asc') {
+                    newOrder = 'desc';
+                }
+                
+                // 現在のURLパラメータを取得
+                const params = new URLSearchParams(window.location.search);
+                params.set('sort', sortField);
+                params.set('order', newOrder);
+                
+                // ページを更新
+                window.location.search = params.toString();
+            });
+        });
+        
+        // フィルタクリア機能
+        document.getElementById('clearFilter').addEventListener('click', function() {
+            // フィルタフォームの全入力をクリア
+            const form = document.getElementById('filterForm');
+            const inputs = form.querySelectorAll('input[type="text"], input[type="number"]');
+            inputs.forEach(input => input.value = '');
+            
+            // URLパラメータをクリアしてページを更新
+            window.location.href = window.location.pathname;
+        });
+        
+        // 全選択機能
+        document.getElementById('selectAll').addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('input[name="selected_urls[]"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+        });
+    </script>
     <script src="js/script.js"></script>
 </body>
 </html>

@@ -45,19 +45,23 @@ function getSheetData() {
     error_log("Encoded Sheet Name: " . $encodedSheetName);
     
     // cURLを使用してAPIリクエスト
+    error_log('[getSheetData] cURLリクエスト開始');
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ（デバッグ用）
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
     $response = curl_exec($ch);
-    
     if (curl_errno($ch)) {
-        error_log('Curl error: ' . curl_error($ch));
+        error_log('[getSheetData] cURLエラー: ' . curl_error($ch));
         return [];
     }
-    
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    error_log("HTTP Response Code: " . $httpCode);
+    error_log("[getSheetData] HTTP Response Code: " . $httpCode);
+    error_log('[getSheetData] cURLリクエスト正常終了');
     
     curl_close($ch);
     
@@ -154,18 +158,27 @@ function getAccessToken($serviceAccountJson) {
         $jwt = generateJWT($privateKey, $clientEmail);
         
         // アクセストークンを取得するリクエスト
+        error_log('[getAccessToken] アクセストークン取得リクエスト開始');
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, 'https://oauth2.googleapis.com/token');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
             'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
             'assertion' => $jwt
         ]));
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ（デバッグ用）
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
         
         $response = curl_exec($ch);
-        
+        if (curl_errno($ch)) {
+            error_log('[getAccessToken] cURLエラー: ' . curl_error($ch));
+        } else {
+            error_log('[getAccessToken] アクセストークン取得リクエスト正常終了');
+        }
         if (curl_errno($ch)) {
             error_log('Curl error when getting access token: ' . curl_error($ch));
             curl_close($ch);
@@ -255,9 +268,12 @@ function writeToSheet($range, $values) {
     error_log("Final API URL: " . $apiUrl);
     
     // cURLを使用してAPIリクエスト（PUT）
+    error_log('[writeToSheet] Google Sheets APIリクエスト開始');
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $apiUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
     curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
     
@@ -270,9 +286,15 @@ function writeToSheet($range, $values) {
     
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ（デバッグ用）
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
     
     $response = curl_exec($ch);
-    
+    if (curl_errno($ch)) {
+        error_log('[writeToSheet] cURLエラー: ' . curl_error($ch));
+    } else {
+        error_log('[writeToSheet] Google Sheets APIリクエスト正常終了');
+    }
     if (curl_errno($ch)) {
         error_log('Curl error: ' . curl_error($ch));
         curl_close($ch);
@@ -288,8 +310,6 @@ function writeToSheet($range, $values) {
     
     return ($httpCode >= 200 && $httpCode < 300);
 }
-
-
 
 /**
  * リライト回数を計算する関数
@@ -491,23 +511,28 @@ function analyzeArticleIssues($title, $description, $content) {
     ];
     
     // OpenAI APIにリクエスト
+    error_log('[analyzeArticleIssues] OpenAI APIリクエスト開始');
     $ch = curl_init('https://api.openai.com/v1/chat/completions');
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
         'Authorization: Bearer ' . $apiKey
     ]);
-    
-    // タイムアウト設定を追加
-    curl_setopt($ch, CURLOPT_TIMEOUT, 180); // 180秒のタイムアウト
+    curl_setopt($ch, CURLOPT_TIMEOUT, 180); // タイムアウトを180秒に設定
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 60); // 接続タイムアウト60秒
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ
     
     error_log("Sending request to OpenAI API for article analysis");
     $response = curl_exec($ch);
-    
+    if (curl_errno($ch)) {
+        error_log('[analyzeArticleIssues] cURLエラー: ' . curl_error($ch));
+    } else {
+        error_log('[analyzeArticleIssues] OpenAI APIリクエスト正常終了');
+    }
     if (curl_errno($ch)) {
         $curlError = curl_error($ch);
         error_log("cURL error in analyzeArticleIssues: " . $curlError);
@@ -653,8 +678,11 @@ function improveArticle($title, $description, $content, $issues) {
         }
         
         // APIリクエストを実行
+        error_log('[improveArticle] OpenAI APIリクエスト開始');
         $ch = curl_init($endpoint);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -667,6 +695,11 @@ function improveArticle($title, $description, $content, $issues) {
         
         error_log("Sending request to OpenAI API");
         $response = curl_exec($ch);
+        if (curl_errno($ch)) {
+            error_log('[improveArticle] cURLエラー: ' . curl_error($ch));
+        } else {
+            error_log('[improveArticle] OpenAI APIリクエスト正常終了');
+        }
         
         if (curl_errno($ch)) {
             $curlError = curl_error($ch);
@@ -935,6 +968,8 @@ function getOriginalArticle($sheetData, $url) {
                 $ch = curl_init();
                 curl_setopt($ch, CURLOPT_URL, $url);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // リダイレクトを追跡
                 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ
                 curl_setopt($ch, CURLOPT_TIMEOUT, 15); // タイムアウト設定を短く

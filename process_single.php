@@ -78,6 +78,18 @@ if ($originalArticle) {
             $originalArticle['content']
         );
         
+        // analyzeArticleIssuesのエラー判定
+        if (strpos($issues, 'エラーが発生しました') !== false || strpos($issues, 'APIエラーが発生しました') !== false) {
+            error_log("analyzeArticleIssuesでエラー: {$issues}。次の記事にスキップします。");
+            $_SESSION['results'][$currentUrl] = [
+                'success' => false,
+                'error' => "記事分析中にエラーが発生したため、次の記事に進みました。エラー内容: {$issues}"
+            ];
+            $_SESSION['current_index'] = $currentIndex + 1;
+            header('Location: processing.php');
+            exit;
+        }
+
         // 分析後の処理時間をチェック
         $currentTime = microtime(true);
         $elapsedTime = $currentTime - $startTime;

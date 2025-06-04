@@ -580,7 +580,7 @@ function improveArticle($title, $description, $content, $issues) {
     
     try {
         // OpenAI APIのモデルとエンドポイント
-        $model = getenv('OPENAI_MODEL') ?: 'gpt-4o-mini';
+        $model = getenv('OPENAI_MODEL') ?: 'gpt-4o';
         $apiKey = getenv('OPENAI_API_KEY');
         $endpoint = 'https://api.openai.com/v1/chat/completions';
         

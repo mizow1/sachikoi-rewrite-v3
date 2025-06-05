@@ -176,6 +176,15 @@ $pageTitle = "記事リライトツール";
                         </div>
                     </div>
                     
+
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label>リライト回数:</label>
+                            <input type="number" name="rewrite_min" value="<?php echo $rewriteMin !== null ? $rewriteMin : ''; ?>" placeholder="最小値">
+                            <span>〜</span>
+                            <input type="number" name="rewrite_max" value="<?php echo $rewriteMax !== null ? $rewriteMax : ''; ?>" placeholder="最大値">
+                        </div>
+                    </div>
                     <div class="filter-row">
                         <div class="filter-group">
                             <label>表示回数:</label>
@@ -208,14 +217,6 @@ $pageTitle = "記事リライトツール";
                         </div>
                     </div>
                     
-                    <div class="filter-row">
-                        <div class="filter-group">
-                            <label>リライト回数:</label>
-                            <input type="number" name="rewrite_min" value="<?php echo $rewriteMin !== null ? $rewriteMin : ''; ?>" placeholder="最小値">
-                            <span>〜</span>
-                            <input type="number" name="rewrite_max" value="<?php echo $rewriteMax !== null ? $rewriteMax : ''; ?>" placeholder="最大値">
-                        </div>
-                    </div>
                     
                     <div class="filter-buttons">
                         <button type="submit" class="btn btn-primary">フィルタ適用</button>

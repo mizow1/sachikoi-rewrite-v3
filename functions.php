@@ -481,7 +481,65 @@ function analyzeArticleIssues($title, $description, $content) {
     
     // HTMLタグを除去してプレーンテキストに変換
     $plainContent = strip_tags($content);
-    
+
+    // 制御文字・NULLバイトなどを除去するフィルタ関数
+    if (!function_exists('remove_invisible_chars')) {
+        function remove_invisible_chars($str) {
+            return preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\x80-\x9F]/u', '', $str);
+        }
+    }
+
+    // 文字コードをUTF-8に統一し、不正なバイトを強制除去
+    $title = mb_convert_encoding($title, 'UTF-8', 'UTF-8');
+    $description = mb_convert_encoding($description, 'UTF-8', 'UTF-8');
+    $plainContent = mb_convert_encoding($plainContent, 'UTF-8', 'UTF-8');
+    $title = iconv('UTF-8', 'UTF-8//IGNORE', $title);
+    $description = iconv('UTF-8', 'UTF-8//IGNORE', $description);
+    $plainContent = iconv('UTF-8', 'UTF-8//IGNORE', $plainContent);
+    $title = remove_invisible_chars($title);
+    $description = remove_invisible_chars($description);
+    $plainContent = remove_invisible_chars($plainContent);
+
+    // 念のため全てstring型にキャスト
+    $title = (string)$title;
+    $description = (string)$description;
+    $plainContent = (string)$plainContent;
+
+    // 不正なUTF-8文字を完全に除去する（1文字ずつチェック）
+    if (!function_exists('clean_utf8_string')) {
+        function clean_utf8_string($str) {
+            $result = '';
+            $len = mb_strlen($str, 'UTF-8');
+            for ($i = 0; $i < $len; $i++) {
+                $char = mb_substr($str, $i, 1, 'UTF-8');
+                if (mb_check_encoding($char, 'UTF-8')) {
+                    $result .= $char;
+                } else {
+                    $result .= '?';
+                }
+            }
+            return $result;
+        }
+    }
+    $title = clean_utf8_string($title);
+    $description = clean_utf8_string($description);
+    $plainContent = clean_utf8_string($plainContent);
+
+    // mb_check_encodingで不正なUTF-8がないか確認し、エラー時は画面返却用に情報をセット
+    $utf8ErrorFields = [];
+    if (!mb_check_encoding($title, 'UTF-8')) {
+        error_log("[analyzeArticleIssues] Invalid UTF-8 in title: " . print_r($title, true));
+        $utf8ErrorFields[] = 'タイトル';
+    }
+    if (!mb_check_encoding($description, 'UTF-8')) {
+        error_log("[analyzeArticleIssues] Invalid UTF-8 in description: " . print_r($description, true));
+        $utf8ErrorFields[] = 'ディスクリプション';
+    }
+    if (!mb_check_encoding($plainContent, 'UTF-8')) {
+        error_log("[analyzeArticleIssues] Invalid UTF-8 in plainContent: " . print_r($plainContent, true));
+        $utf8ErrorFields[] = '本文';
+    }
+
     // コンテンツが長すぎる場合は切り詰める
     if (strlen($plainContent) > 4000) {
         $plainContent = substr($plainContent, 0, 4000) . "...";
@@ -517,7 +575,23 @@ function analyzeArticleIssues($title, $description, $content) {
     curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
     curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    $jsonData = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    if ($jsonData === false) {
+        $jsonError = json_last_error_msg();
+        error_log("[analyzeArticleIssues] json_encode failed: " . $jsonError);
+        error_log("[analyzeArticleIssues] data: " . print_r($data, true));
+        $utf8Msg = '';
+        if (!empty($utf8ErrorFields)) {
+            $utf8Msg = "\n（不正なUTF-8文字列が含まれていたフィールド: " . implode('・', $utf8ErrorFields) . "）";
+        }
+        // データ内容も画面に出す（エスケープ）
+        $dumpMsg = "\n---\nタイトル: " . htmlspecialchars($title) . "\n---\nディスクリプション: " . htmlspecialchars($description) . "\n---\n本文先頭100: " . htmlspecialchars(mb_substr($plainContent, 0, 100)) . "...";
+        // $data配列全体もbase64エンコードして出す
+        $dataDump = base64_encode(print_r($data, true));
+        $dumpMsg .= "\n---\n[data配列(base64)]:\n" . $dataDump;
+        return "分析中にエラーが発生しました（json_encode失敗: {$jsonError}{$utf8Msg}）" . $dumpMsg;
+    }
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
         'Authorization: Bearer ' . $apiKey
@@ -547,7 +621,21 @@ function analyzeArticleIssues($title, $description, $content) {
     
     if ($httpCode != 200) {
         error_log("HTTP error in OpenAI API call for analysis: " . $httpCode);
-        error_log("Response: " . substr($response, 0, 1000));
+        error_log("[analyzeArticleIssues] Request prompt: " . $prompt);
+        error_log("[analyzeArticleIssues] Response: " . substr($response, 0, 1000));
+        $errorDetail = '';
+        $errorJson = json_decode($response, true);
+        if (is_array($errorJson) && isset($errorJson['error'])) {
+            $err = $errorJson['error'];
+            $errorDetail = isset($err['message']) ? $err['message'] : '';
+            $errorType = isset($err['type']) ? $err['type'] : '';
+            $errorParam = isset($err['param']) ? $err['param'] : '';
+            error_log("[analyzeArticleIssues] API error detail: message={$errorDetail}, type={$errorType}, param={$errorParam}");
+            return "分析中にAPIエラーが発生しました (HTTP {$httpCode})\n" .
+                   "エラー詳細: " . htmlspecialchars($errorDetail) .
+                   (!empty($errorType) ? "\nタイプ: " . htmlspecialchars($errorType) : '') .
+                   (!empty($errorParam) ? "\nパラメータ: " . htmlspecialchars($errorParam) : '');
+        }
         return "分析中にAPIエラーが発生しました (HTTP {$httpCode})";
     }
     

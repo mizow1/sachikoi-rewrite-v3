@@ -477,7 +477,14 @@ function analyzeArticleIssues($title, $description, $content) {
     ini_set('memory_limit', '512M');
     
     $apiKey = OPENAI_API_KEY;
-    $model = OPENAI_MODEL;
+    // 選択されたAIモデルを使用（セッションから取得）
+    $model = defined('SELECTED_AI_MODEL') ? SELECTED_AI_MODEL : OPENAI_MODEL;
+    
+    // 選択されたモデルをログに記録
+    error_log("[analyzeArticleIssues] 選択されたAIモデル: " . $model);
+    
+    // モデル名に基づいてAPIを選択
+    $isClaudeModel = (strpos($model, 'claude') !== false);
     
     // HTMLタグを除去してプレーンテキストに変換
     $plainContent = strip_tags($content);
@@ -546,66 +553,112 @@ function analyzeArticleIssues($title, $description, $content) {
         error_log("Content truncated for analysis to 4000 characters");
     }
     
-    // OpenAI APIへのリクエスト内容
+    // プロンプトの作成
     $prompt = "以下の記事のSEO観点での問題点を分析してください。具体的な改善ポイントを箇条書きで示してください。\n\n";
     $prompt .= "タイトル: {$title}\n";
     $prompt .= "メタディスクリプション: {$description}\n";
     $prompt .= "本文: {$plainContent}";
     
-    $data = [
-        'model' => $model,
-        'messages' => [
-            [
-                'role' => 'system',
-                'content' => 'あなたはSEOに詳しい専門家です。記事の問題点を分析し、具体的な改善ポイントを提案してください。'
-            ],
-            [
-                'role' => 'user',
-                'content' => $prompt
-            ]
-        ],
-        'temperature' => 0.7,
-        'max_tokens' => 1000
-    ];
+    $systemPrompt = 'あなたはSEOに詳しい専門家です。記事の問題点を分析し、具体的な改善ポイントを提案してください。';
     
-    // OpenAI APIにリクエスト
-    error_log('[analyzeArticleIssues] OpenAI APIリクエスト開始');
-    $ch = curl_init('https://api.openai.com/v1/chat/completions');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
-    curl_setopt($ch, CURLOPT_POST, true);
-    $jsonData = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-    if ($jsonData === false) {
-        $jsonError = json_last_error_msg();
-        error_log("[analyzeArticleIssues] json_encode failed: " . $jsonError);
-        error_log("[analyzeArticleIssues] data: " . print_r($data, true));
-        $utf8Msg = '';
-        if (!empty($utf8ErrorFields)) {
-            $utf8Msg = "\n（不正なUTF-8文字列が含まれていたフィールド: " . implode('・', $utf8ErrorFields) . "）";
+    // モデルに応じてAPIを使い分ける
+    if ($isClaudeModel) {
+        // Claude APIの設定
+        $claudeApiKey = getenv('ANTHROPIC_API_KEY');
+        if (empty($claudeApiKey)) {
+            error_log("[analyzeArticleIssues] Claude APIキーが設定されていません。OpenAI APIにフォールバックします。");
+            $isClaudeModel = false;
+        } else {
+            // Claude API用のリクエストデータを作成
+            $data = [
+                'model' => $model,
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => $systemPrompt . "\n\n" . $prompt
+                    ]
+                ],
+                'max_tokens' => 1000
+            ];
+            
+            // Claude APIにリクエスト
+            error_log('[analyzeArticleIssues] Claude APIリクエスト開始: ' . $model);
+            $ch = curl_init('https://api.anthropic.com/v1/messages');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'x-api-key: ' . $claudeApiKey,
+                'anthropic-version: 2023-06-01'
+            ]);
         }
-        // データ内容も画面に出す（エスケープ）
-        $dumpMsg = "\n---\nタイトル: " . htmlspecialchars($title) . "\n---\nディスクリプション: " . htmlspecialchars($description) . "\n---\n本文先頭100: " . htmlspecialchars(mb_substr($plainContent, 0, 100)) . "...";
-        // $data配列全体もbase64エンコードして出す
-        $dataDump = base64_encode(print_r($data, true));
-        $dumpMsg .= "\n---\n[data配列(base64)]:\n" . $dataDump;
-        return "分析中にエラーが発生しました（json_encode失敗: {$jsonError}{$utf8Msg}）" . $dumpMsg;
     }
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'Authorization: Bearer ' . $apiKey
-    ]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 180); // タイムアウトを180秒に設定
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 60); // 接続タイムアウト60秒
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ
+    
+    // OpenAI APIを使用する場合
+    if (!$isClaudeModel) {
+        $data = [
+            'model' => $model,
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => $systemPrompt
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $prompt
+                ]
+            ],
+            'temperature' => 0.7,
+            'max_tokens' => 1000
+        ];
+        
+        // OpenAI APIにリクエスト
+        error_log('[analyzeArticleIssues] OpenAI APIリクエスト開始: ' . $model);
+        $ch = curl_init('https://api.openai.com/v1/chat/completions');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
+        curl_setopt($ch, CURLOPT_POST, true);
+        $jsonData = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($jsonData === false) {
+            $jsonError = json_last_error_msg();
+            error_log("[analyzeArticleIssues] json_encode failed: " . $jsonError);
+            error_log("[analyzeArticleIssues] data: " . print_r($data, true));
+            $utf8Msg = '';
+            if (!empty($utf8ErrorFields)) {
+                $utf8Msg = "\n（不正なUTF-8文字列が含まれていたフィールド: " . implode('・', $utf8ErrorFields) . "）";
+            }
+            // データ内容も画面に出す（エスケープ）
+            $dumpMsg = "\n---\nタイトル: " . htmlspecialchars($title) . "\n---\nディスクリプション: " . htmlspecialchars($description) . "\n---\n本文先頭100: " . htmlspecialchars(mb_substr($plainContent, 0, 100)) . "...";
+            // $data配列全体もbase64エンコードして出す
+            $dataDump = base64_encode(print_r($data, true));
+            $dumpMsg .= "\n---\n[data配列(base64)]:\n" . $dataDump;
+            return "分析中にエラーが発生しました（json_encode失敗: {$jsonError}{$utf8Msg}）" . $dumpMsg;
+        }
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $apiKey
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 180); // タイムアウトを180秒に設定
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 60); // 接続タイムアウト60秒
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ
+    }
     
     error_log("Sending request to OpenAI API for article analysis");
     $response = curl_exec($ch);
     if (curl_errno($ch)) {
         error_log('[analyzeArticleIssues] cURLエラー: ' . curl_error($ch));
     } else {
-        error_log('[analyzeArticleIssues] OpenAI APIリクエスト正常終了');
+        // 使用したAPIをログに記録
+        if ($isClaudeModel) {
+            error_log('[analyzeArticleIssues] Claude APIリクエスト正常終了: ' . $model);
+        } else {
+            error_log('[analyzeArticleIssues] OpenAI APIリクエスト正常終了: ' . $model);
+        }
     }
     if (curl_errno($ch)) {
         $curlError = curl_error($ch);
@@ -641,13 +694,26 @@ function analyzeArticleIssues($title, $description, $content) {
     
     $result = json_decode($response, true);
     
-    if (isset($result['choices'][0]['message']['content'])) {
-        error_log("Successfully received analysis from OpenAI");
-        return $result['choices'][0]['message']['content'];
+    // 使用したAPIに応じてレスポンス形式を判別
+    if ($isClaudeModel) {
+        // Claude APIのレスポンス形式を処理
+        if (isset($result['content']) && is_array($result['content']) && !empty($result['content'][0]['text'])) {
+            error_log("Successfully received analysis from Claude API: " . $model);
+            return $result['content'][0]['text'];
+        } else {
+            error_log("Failed to parse Claude API response: " . substr($response, 0, 1000));
+            return '分析中にエラーが発生しました。Claude APIのレスポンス形式が不正です。';
+        }
+    } else {
+        // OpenAI APIのレスポンス形式を処理
+        if (isset($result['choices'][0]['message']['content'])) {
+            error_log("Successfully received analysis from OpenAI API: " . $model);
+            return $result['choices'][0]['message']['content'];
+        } else {
+            error_log("Failed to parse OpenAI API response: " . substr($response, 0, 1000));
+            return '分析中にエラーが発生しました。OpenAI APIのレスポンス形式が不正です。';
+        }
     }
-    
-    error_log("Failed to parse OpenAI response for analysis");
-    return '分析中にエラーが発生しました。';
 }
 
 /**
@@ -659,7 +725,21 @@ function analyzeArticleIssues($title, $description, $content) {
  * @param string $issues 分析された問題点
  * @return array 改善された記事（タイトル、ディスクリプション、本文）
  */
-function improveArticle($title, $description, $content, $issues) {
+/**
+ * 記事を改善する関数
+ * 
+ * @param string $title 記事のタイトル
+ * @param string $description 記事の説明
+ * @param string $content 記事の内容
+ * @param string $issues 記事の問題点
+ * @param string $model 使用するAIモデル（デフォルト: gpt-4o）
+ * @return array 改善された記事の情報（タイトル、説明、内容）
+ */
+function improveArticle($title, $description, $content, $issues, $model = null) {
+    // モデルが指定されていない場合は、定数またはデフォルト値を使用
+    if ($model === null) {
+        $model = defined('SELECTED_AI_MODEL') ? SELECTED_AI_MODEL : (getenv('OPENAI_MODEL') ?: 'gpt-4o');
+    }
     // 処理時間の制限を設定（最大実行時間を300秒に設定）
     set_time_limit(300);
     
@@ -667,12 +747,33 @@ function improveArticle($title, $description, $content, $issues) {
     ini_set('memory_limit', '512M');
     
     try {
-        // OpenAI APIのモデルとエンドポイント
-        $model = getenv('OPENAI_MODEL') ?: 'gpt-4o';
-        $apiKey = getenv('OPENAI_API_KEY');
-        $endpoint = 'https://api.openai.com/v1/chat/completions';
+        // 選択されたAIモデルを使用（セッションから取得）
+        $model = defined('SELECTED_AI_MODEL') ? SELECTED_AI_MODEL : (getenv('OPENAI_MODEL') ?: 'gpt-4o');
         
-        error_log("Improving article with OpenAI API. Model: " . $model);
+        // モデルのプロバイダを判定
+        $isClaudeModel = (strpos($model, 'claude') !== false);
+        
+        // モデル設定の取得
+        $modelConfig = [];
+        if (defined('AI_MODELS') && isset(AI_MODELS[$model])) {
+            $modelConfig = AI_MODELS[$model];
+        } else {
+            // デフォルト設定
+            $modelConfig = [
+                'max_tokens' => $isClaudeModel ? 8000 : 8000,
+                'temperature' => 0.8
+            ];
+        }
+        
+        if ($isClaudeModel) {
+            $apiKey = getenv('ANTHROPIC_API_KEY');
+            $endpoint = 'https://api.anthropic.com/v1/messages';
+            error_log("Improving article with Claude API. Model: " . $model);
+        } else {
+            $apiKey = getenv('OPENAI_API_KEY');
+            $endpoint = 'https://api.openai.com/v1/chat/completions';
+            error_log("Improving article with OpenAI API. Model: " . $model);
+        }
         
         // 記事本文から<p>関連の夢</p>以降を除外し、リライト対象外とする
         $contentToRewrite = $content;
@@ -742,21 +843,53 @@ function improveArticle($title, $description, $content, $issues) {
         
         $userContent = "元の記事:\nタイトル: {$cleanTitle}\nメタディスクリプション: {$cleanDescription}\n本文: {$cleanContent}\n\n{$issuesList}\n\n改善した記事を以下のフォーマットで出力してください：\nタイトル: [改善されたタイトル]\nメタディスクリプション: [改善されたメタディスクリプション]\n本文: [改善された本文]";
         
-        $requestData = [
-            'model' => $model,
-            'messages' => [
-                [
-                    'role' => 'system',
-                    'content' => $systemContent
+        // APIリクエストデータを作成 - APIに応じて形式を変える
+        if ($isClaudeModel) {
+            // Claude API用のリクエストデータ
+            $requestData = [
+                'model' => $model,
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => $systemContent . "\n\n" . $userContent
+                    ]
                 ],
-                [
-                    'role' => 'user',
-                    'content' => $userContent
-                ]
-            ],
-            'temperature' => 0.8, // 創造性を高める
-            'max_tokens' => 8000 // トークン数を増やしてより長文に対応
-        ];
+                'max_tokens' => isset($modelConfig['max_tokens']) ? $modelConfig['max_tokens'] : 8000,
+                'temperature' => isset($modelConfig['temperature']) ? $modelConfig['temperature'] : 0.8
+            ];
+            
+            $headers = [
+                'Content-Type: application/json',
+                'x-api-key: ' . $apiKey,
+                'anthropic-version: 2023-06-01'
+            ];
+            
+            error_log('[improveArticle] Claude APIリクエストを作成: ' . $model . ', max_tokens=' . $requestData['max_tokens'] . ', temperature=' . $requestData['temperature']);
+        } else {
+            // OpenAI API用のリクエストデータ
+            $requestData = [
+                'model' => $model,
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => $systemContent
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => $userContent
+                    ]
+                ],
+                'temperature' => isset($modelConfig['temperature']) ? $modelConfig['temperature'] : 0.8,
+                'max_tokens' => isset($modelConfig['max_tokens']) ? $modelConfig['max_tokens'] : 8000
+            ];
+            
+            $headers = [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $apiKey
+            ];
+            
+            error_log('[improveArticle] OpenAI APIリクエストを作成: ' . $model . ', max_tokens=' . $requestData['max_tokens'] . ', temperature=' . $requestData['temperature']);
+        }
         
         // JSONエンコードをデバッグ
         $jsonData = json_encode($requestData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
@@ -766,27 +899,22 @@ function improveArticle($title, $description, $content, $issues) {
         }
         
         // APIリクエストを実行
-        error_log('[improveArticle] OpenAI APIリクエスト開始');
+        error_log('[improveArticle] ' . ($isClaudeModel ? 'Claude' : 'OpenAI') . ' APIリクエスト開始');
         $ch = curl_init($endpoint);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . $apiKey
-        ]);
         curl_setopt($ch, CURLOPT_TIMEOUT, 180); // タイムアウトを180秒に設定
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 60); // 接続タイムアウト60秒
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ
         
-        error_log("Sending request to OpenAI API");
+        error_log("Sending request to " . ($isClaudeModel ? 'Claude' : 'OpenAI') . " API");
         $response = curl_exec($ch);
         if (curl_errno($ch)) {
             error_log('[improveArticle] cURLエラー: ' . curl_error($ch));
         } else {
-            error_log('[improveArticle] OpenAI APIリクエスト正常終了');
+            error_log('[improveArticle] ' . ($isClaudeModel ? 'Claude' : 'OpenAI') . ' APIリクエスト正常終了');
         }
         
         if (curl_errno($ch)) {
@@ -799,23 +927,36 @@ function improveArticle($title, $description, $content, $issues) {
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         
-        error_log("OpenAI API response code: " . $httpCode);
+        error_log(($isClaudeModel ? 'Claude' : 'OpenAI') . " API response code: " . $httpCode);
         
         if ($httpCode != 200) {
-            error_log("HTTP error in OpenAI API call: " . $httpCode);
+            error_log("HTTP error in " . ($isClaudeModel ? 'Claude' : 'OpenAI') . " API call: " . $httpCode);
             error_log("Response: " . substr($response, 0, 1000));
-            throw new Exception("APIレスポンスエラー (HTTP {$httpCode})");
+            throw new Exception(($isClaudeModel ? 'Claude' : 'OpenAI') . " APIレスポンスエラー (HTTP {$httpCode})");
         }
         
         $result = json_decode($response, true);
         
-        if (!$result || !isset($result['choices'][0]['message']['content'])) {
-            error_log("Failed to parse OpenAI response: " . substr($response, 0, 1000));
-            throw new Exception("APIレスポンスの解析に失敗しました");
+        // APIに応じてレスポンス形式を判別
+        if ($isClaudeModel) {
+            // Claude APIのレスポンス形式を処理
+            if (!$result || !isset($result['content']) || !is_array($result['content']) || empty($result['content'][0]['text'])) {
+                error_log("Failed to parse Claude API response: " . substr($response, 0, 1000));
+                throw new Exception("Claude APIレスポンスの解析に失敗しました");
+            }
+            
+            $improvedContent = $result['content'][0]['text'];
+            error_log("Successfully received improved content from Claude API: " . $model);
+        } else {
+            // OpenAI APIのレスポンス形式を処理
+            if (!$result || !isset($result['choices'][0]['message']['content'])) {
+                error_log("Failed to parse OpenAI API response: " . substr($response, 0, 1000));
+                throw new Exception("OpenAI APIレスポンスの解析に失敗しました");
+            }
+            
+            $improvedContent = $result['choices'][0]['message']['content'];
+            error_log("Successfully received improved content from OpenAI API: " . $model);
         }
-        
-        $improvedContent = $result['choices'][0]['message']['content'];
-        error_log("Successfully received improved content from OpenAI");
         
         // 改善された内容を解析
         $improvedTitle = $title; // デフォルトは元のタイトル

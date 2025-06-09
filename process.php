@@ -23,10 +23,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     
+    // 選択されたAIモデルを取得
+    $aiModel = isset($_POST['ai_model']) ? $_POST['ai_model'] : 'gpt-4o';
+    
     // 処理を軸に分割して実行するためのパラメータをセッションに保存
     $_SESSION['processing_urls'] = $selectedUrls;
     $_SESSION['current_index'] = 0;
     $_SESSION['results'] = [];
+    $_SESSION['ai_model'] = $aiModel;
     
     // 処理ページにリダイレクト
     header('Location: process_single.php');

@@ -31,6 +31,64 @@ define('USE_SERVICE_ACCOUNT', getenv('USE_SERVICE_ACCOUNT') === 'true');
 define('OPENAI_API_KEY', getenv('OPENAI_API_KEY'));
 define('OPENAI_MODEL', getenv('OPENAI_MODEL'));
 
+// AIモデル設定
+// モデル名、プロバイダ、トークン制限、温度、料金情報を定義
+define('AI_MODELS', [
+    'gpt-4o' => [
+        'name' => 'GPT-4o',
+        'provider' => 'openai',
+        'max_tokens' => 8000,
+        'temperature' => 0.7,
+        'cost' => '安い',
+        'speed' => '速い',
+        'quality' => '普通',
+        'description' => '最新のGPT-4モデル。高品質な記事生成が可能。'
+    ],
+    'gpt-4o-mini' => [
+        'name' => 'GPT-4o Mini',
+        'provider' => 'openai',
+        'max_tokens' => 4000,
+        'temperature' => 0.7,
+        'cost' => '最安',
+        'speed' => '速い',
+        'quality' => '普通',
+        'description' => 'GPT-4oの軽量版。コストパフォーマンスに優れたモデル。'
+    ],
+    'claude-3-7-sonnet-latest' => [
+        'name' => 'Claude 3.7 Sonnet',
+        'provider' => 'anthropic',
+        'max_tokens' => 8000,
+        'temperature' => 0.8,
+        'cost' => '中程度',
+        'speed' => '標準',
+        'quality' => '高い',
+        'description' => 'バランスの取れたAnthropicモデル。コストと品質のバランスが良い。'
+    ],
+    'claude-sonnet-4-20250514' => [
+        'name' => 'Claude 4 Sonnet',
+        'provider' => 'anthropic',
+        'max_tokens' => 8000,
+        'temperature' => 0.8,
+        'cost' => '高い',
+        'speed' => '標準',
+        'quality' => '最高',
+        'description' => 'Anthropicの最新モデル。高品質な記事生成が可能。'
+    ],
+    'claude-opus-4-20250514' => [
+        'name' => 'Claude 4 Opus',
+        'provider' => 'anthropic',
+        'max_tokens' => 10000,
+        'temperature' => 0.8,
+        'cost' => '非常に高い',
+        'speed' => '遅い',
+        'quality' => '最高',
+        'description' => 'Anthropicの最高品質モデル。複雑な分析と長文生成に最適。'
+    ]
+]);
+
+// デフォルトAIモデル設定
+define('DEFAULT_AI_MODEL', 'gpt-4o');
+
 // タイムゾーン設定
 date_default_timezone_set('Asia/Tokyo');
 

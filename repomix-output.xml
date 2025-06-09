@@ -1,3 +1,156 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: index.php, README.md
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+index.php
+README.md
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="README.md">
+# 記事リライトツール（Google Sheets × OpenAI API）
+
+## プロジェクト概要
+
+Google Sheetsから記事データを取得し、OpenAI APIを活用してSEO観点で自動リライト・改善を行うWebアプリケーションです。
+
+- **主な機能**
+  - Google Sheetsから記事データを取得
+  - 各記事のタイトル・ディスクリプション・本文を表示
+  - OpenAI APIで「改善点分析」「自動リライト」
+  - フィルタ・ソート・リライト回数管理
+
+---
+
+## ディレクトリ構成・主要ファイル
+
+```
+.
+├── index.php               # メイン画面・記事一覧/フィルタ/リライト起動
+├── detail.php              # 記事詳細ページ
+├── process.php             # 一括処理用
+├── process_single.php      # 単体記事処理用
+├── functions.php           # 主要ロジック（API, データ処理, エラーハンドリング等）
+├── config.php              # 環境変数・設定
+├── includes/
+│   ├── api/                # API関連分割用ディレクトリ（今後のリファクタリング用）
+│   ├── google/             # Google Sheets関連分割用
+│   └── utils/              # 汎用関数分割用
+```
+
+---
+
+## システム設計・主な処理フロー
+
+1. **Google Sheetsから記事データ取得**
+   - APIキー/スプレッドシートIDは環境変数で管理
+   - 取得データは配列として保持
+
+2. **一覧表示・フィルタ機能**
+   - キーワード、リライト回数、表示回数などで絞込
+   - ソートも可能
+
+3. **記事ごとにOpenAI APIで分析・リライト**
+   - `functions.php`の`analyzeArticleIssues`で改善点を生成
+   - `improveArticle`でリライト案を生成
+   - 進捗・エラーは画面/ログ両方に表示
+
+4. **リライト回数管理**
+   - 各記事ごとにリライト実施回数をカウント
+   - Google Sheets側にも反映可能
+
+---
+
+## ここまでのエラー解決・改善経緯
+
+### 発生していた問題
+- OpenAI API呼び出し時に `json_encode失敗: Malformed UTF-8 characters, possibly incorrectly encoded` エラーが頻発
+- タイトル・本文などが一見正常でも、APIリクエスト時にHTTP 400エラー
+
+### 対応策
+1. **UTF-8正規化・不可視バイト除去**
+   - `mb_convert_encoding`/`iconv`/正規表現で不可視バイトや制御文字を除去
+2. **1文字ずつUTF-8チェック**
+   - 不正な文字は「?」に置換
+3. **json_encode失敗時の詳細ログ・画面返却**
+   - どのフィールドが壊れているか、データ内容も画面出力
+4. **json_encodeに `JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE` を追加**
+   - これにより、ほぼ全てのUTF-8エラーが解消
+
+### 結果
+- どんなデータでもAPIリクエストが通るようになり、安定運用可能に
+- エラー時も原因特定が容易になった
+
+---
+
+## 今後のリファクタリング方針
+- `functions.php`の肥大化部分をAPI/Google/utils等に分割
+- 共通処理やエラーハンドリングをモジュール化
+- コード可読性・保守性向上
+
+---
+
+## 補足・運用Tips
+- サーバーエラーログは `/var/log/apache2/error.log` や `php_error.log` を参照
+- OpenAI/Google APIキーは漏洩注意
+- PHPのバージョン依存バグにも注意（推奨: 7.4以降）
+
+---
+
+## 開発・運用履歴
+- 2025/06: UTF-8エラー根絶・安定運用化
+- 2025/06: エラー詳細ダンプ・デバッグ機能追加
+- 2025/06: コード分割リファクタリング計画開始
+
+---
+
+## ライセンス・著作権
+- 本ツールの著作権は開発者に帰属
+- 商用利用・再配布は要相談
+</file>
+
+<file path="index.php">
 <?php
 require_once 'config.php';
 require_once 'functions.php';
@@ -254,28 +407,12 @@ $pageTitle = "記事リライトツール";
                     <div class="ai-selection">
                         <label for="ai_model">使用するAI:</label>
                         <select name="ai_model" id="ai_model">
-                            <?php
-                            // config.phpで定義されたAI_MODELSを使用
-                            $aiModels = defined('AI_MODELS') ? AI_MODELS : [
-                                'gpt-4o' => ['name' => 'GPT-4o', 'cost' => '高い', 'speed' => '標準', 'quality' => '最高', 'description' => 'OpenAIの最新モデル']
-                            ];
-                            
-                            foreach ($aiModels as $modelId => $modelInfo): 
-                                $selected = ($modelId === (defined('DEFAULT_AI_MODEL') ? DEFAULT_AI_MODEL : 'gpt-4o')) ? 'selected' : '';
-                                $tooltip = "品質: {$modelInfo['quality']} | 速度: {$modelInfo['speed']} | コスト: {$modelInfo['cost']}";
-                            ?>
-                                <option value="<?php echo $modelId; ?>" 
-                                        title="<?php echo htmlspecialchars($tooltip); ?>" 
-                                        data-description="<?php echo htmlspecialchars($modelInfo['description']); ?>"
-                                        data-quality="<?php echo htmlspecialchars($modelInfo['quality']); ?>"
-                                        data-speed="<?php echo htmlspecialchars($modelInfo['speed']); ?>"
-                                        data-cost="<?php echo htmlspecialchars($modelInfo['cost']); ?>"
-                                        <?php echo $selected; ?>>
-                                    <?php echo htmlspecialchars($modelInfo['name']); ?>
-                                </option>
-                            <?php endforeach; ?>
+                            <option value="gpt-4o">GPT-4o</option>
+                            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                            <option value="claude-3-opus">Claude 3 Opus</option>
+                            <option value="claude-3-sonnet">Claude 3 Sonnet</option>
                         </select>
-                        <div id="model-info" class="model-info-tooltip"></div>
                     </div>
                     <button type="submit" class="btn btn-primary">選択した記事をリライト</button>
                 </div>
@@ -390,3 +527,6 @@ $pageTitle = "記事リライトツール";
     <script src="js/script.js"></script>
 </body>
 </html>
+</file>
+
+</files>

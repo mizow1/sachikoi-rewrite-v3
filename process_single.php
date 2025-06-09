@@ -26,6 +26,10 @@ if (!isset($_SESSION['processing_urls']) || !isset($_SESSION['current_index'])) 
 $processingUrls = $_SESSION['processing_urls'];
 $currentIndex = $_SESSION['current_index'];
 $results = isset($_SESSION['results']) ? $_SESSION['results'] : [];
+$aiModel = isset($_SESSION['ai_model']) ? $_SESSION['ai_model'] : 'gpt-4o';
+
+// 選択されたAIモデルをグローバル変数として定義（関数内で使用するため）
+define('SELECTED_AI_MODEL', $aiModel);
 
 // すべてのURLの処理が完了している場合
 if ($currentIndex >= count($processingUrls)) {
@@ -109,7 +113,8 @@ if ($originalArticle) {
             $originalArticle['title'],
             $originalArticle['description'],
             $originalArticle['content'],
-            $issues
+            $issues,
+            $aiModel // セッションから取得したAIモデルを渡す
         );
         
         // 改善後の処理時間をチェック

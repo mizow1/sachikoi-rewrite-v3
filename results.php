@@ -5,6 +5,9 @@ require_once 'functions.php';
 // セッションから結果を取得
 $results = isset($_SESSION['rewrite_results']) ? $_SESSION['rewrite_results'] : [];
 
+// 使用したAIモデルを取得
+$aiModel = isset($_SESSION['ai_model']) ? $_SESSION['ai_model'] : 'gpt-4o';
+
 // 結果が空の場合はトップページにリダイレクト
 if (empty($results)) {
     header('Location: index.php');
@@ -37,6 +40,7 @@ $pageTitle = "リライト結果";
             <div class="results-summary">
                 <h2>処理結果</h2>
                 <p>処理されたURL数: <?php echo count($results); ?></p>
+                <p class="ai-model-used">使用したAIモデル: <strong><?php echo htmlspecialchars($aiModel); ?></strong></p>
             </div>
 
             <div class="results-list">

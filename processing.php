@@ -14,6 +14,9 @@ $currentIndex = $_SESSION['current_index'];
 $total = count($processingUrls);
 $progress = ($total > 0) ? floor(($currentIndex / $total) * 100) : 0;
 
+// 選択されたAIモデルを取得
+$aiModel = isset($_SESSION['ai_model']) ? $_SESSION['ai_model'] : 'gpt-4o';
+
 // ページタイトル
 $pageTitle = "処理中...";
 ?>
@@ -70,6 +73,14 @@ $pageTitle = "処理中...";
             margin-right: 10px;
         }
         
+        .ai-model-info {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #e8f4ff;
+            border-left: 4px solid #4a6fa5;
+            border-radius: 3px;
+        }
+        
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
@@ -103,6 +114,10 @@ $pageTitle = "処理中...";
                 </p>
                 
                 <p>処理済み: <?php echo $currentIndex; ?> / <?php echo $total; ?></p>
+                
+                <div class="ai-model-info">
+                    <p><strong>使用中のAIモデル:</strong> <?php echo htmlspecialchars($aiModel); ?></p>
+                </div>
                 
                 <div class="note">
                     <p>この処理には時間がかかる場合があります。ページを閉じないでください。</p>

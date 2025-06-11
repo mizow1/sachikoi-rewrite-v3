@@ -286,23 +286,20 @@ function writeToSheet($range, $values) {
  */
 function getNextEmptyColumn($sheetData, $url) {
     $rowIndex = getRowIndex($sheetData, $url);
-    
     if ($rowIndex !== null) {
         $row = $sheetData[$rowIndex];
-        // F列（インデックス5）から始めて、4列ごとに確認
+        // F列（インデックス5）から始め、6列ごとのブロックを確認
         $columnIndex = 5;
-        
-        while (isset($row[$columnIndex]) || 
-               isset($row[$columnIndex + 1]) || 
-               isset($row[$columnIndex + 2]) || 
-               isset($row[$columnIndex + 3])) {
-            $columnIndex += 4;
+        while (
+            isset($row[$columnIndex]) || isset($row[$columnIndex + 1]) ||
+            isset($row[$columnIndex + 2]) || isset($row[$columnIndex + 3]) ||
+            isset($row[$columnIndex + 4]) || isset($row[$columnIndex + 5])
+        ) {
+            $columnIndex += 6; // 次の6列ブロックへ
         }
-        
         return $columnIndex;
     }
-    
-    return 5; // デフォルトはF列（インデックス5）
+    return 5; // デフォルトはF列
 }
 
 /**
@@ -332,45 +329,35 @@ function getRowIndex($sheetData, $url) {
  * @return bool 成功したかどうか
  */
 function writeRewriteResult($url, $originalContent, $issues, $improvedData) {
-    // スプレッドシートからデータを取得
     $sheetData = getSheetData();
-    
-    // 行インデックスを取得
     $rowIndex = getRowIndex($sheetData, $url);
-    
     if ($rowIndex === null) {
         error_log("URL not found in sheet: " . $url);
         return false;
     }
-    
-    // 次の空き列を取得
     $columnIndex = getNextEmptyColumn($sheetData, $url);
-    
-    // 列名を取得（F列は5、G列は6、...）
-    $columnLetter = chr(65 + $columnIndex); // A=65, F=70, ...
-    
-    // 改善された記事データをJSON形式に変換
-    $improvedJson = json_encode($improvedData, JSON_UNESCAPED_UNICODE);
-    
-    // 現在の日時
+    $startLetter = chr(65 + $columnIndex);
+    $endLetter   = chr(65 + $columnIndex + 5); // 6列分
+    $range = $startLetter . ($rowIndex + 2) . ':' . $endLetter . ($rowIndex + 2);
+
+    // Datetime
     $datetime = date('Y-m-d H:i:s');
-    
-    // 書き込むデータを準備
-    $values = [
-        [$originalContent, $issues, $datetime, $improvedJson]
-    ];
-    
-    // 書き込む範囲を指定（例: F2:I2）
-    $range = $columnLetter . ($rowIndex + 2) . ':' . chr(65 + $columnIndex + 3) . ($rowIndex + 2);
-    
-    // スプレッドシートに書き込み
+
+    // Prepare values (HTML content, not JSON)
+    $values = [[
+        $originalContent,
+        $issues,
+        $datetime,
+        $improvedData['title'] ?? '',
+        $improvedData['description'] ?? '',
+        $improvedData['content'] ?? ''
+    ]];
+
     $result = writeToSheet($range, $values);
-    
     if ($result) {
         error_log("Successfully wrote rewrite result to sheet for URL: " . $url);
     } else {
         error_log("Failed to write rewrite result to sheet for URL: " . $url);
     }
-    
     return $result;
 }

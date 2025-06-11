@@ -583,12 +583,23 @@ function analyzeArticleIssues($title, $description, $content) {
             
             // Claude APIにリクエスト
             error_log('[analyzeArticleIssues] Claude APIリクエスト開始: ' . $model);
+            
+            // デバッグ用にリクエストデータをログに出力
+            $jsonData = json_encode($data);
+            error_log('[analyzeArticleIssues] リクエストJSON: ' . $jsonData);
+            
+            // JSONデータが空でないか確認
+            if (empty($jsonData) || $jsonData === 'null' || $jsonData === '{}') {
+                error_log('[analyzeArticleIssues] エラー: JSONデータが空です');
+                return ['error' => 'JSONデータの生成に失敗しました'];
+            }
+            
             $ch = curl_init('https://api.anthropic.com/v1/messages');
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 60);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
             curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Content-Type: application/json',
                 'x-api-key: ' . $claudeApiKey,
@@ -900,32 +911,75 @@ function improveArticle($title, $description, $content, $issues, $model = null) 
         
         // APIリクエストを実行
         error_log('[improveArticle] ' . ($isClaudeModel ? 'Claude' : 'OpenAI') . ' APIリクエスト開始');
+        // デバッグ用にリクエストデータをログに出力
+        $jsonData = json_encode($requestData);
+        error_log('[improveArticle] リクエストJSON: ' . $jsonData);
+        
+        // JSONデータが空でないか確認
+        if (empty($jsonData) || $jsonData === 'null' || $jsonData === '{}') {
+            error_log('[improveArticle] エラー: JSONデータが空です');
+            return ['error' => 'JSONデータの生成に失敗しました'];
+        }
+        
         $ch = curl_init($endpoint);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 180); // タイムアウトを180秒に設定
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 60); // 接続タイムアウト60秒
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 300); // タイムアウトを5分に延長
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 60); // 接続タイムアウト60秒
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ
+        curl_setopt($ch, CURLOPT_TCP_KEEPALIVE, 1); // TCP接続を維持
+        curl_setopt($ch, CURLOPT_TCP_KEEPIDLE, 60); // キープアライブ開始までの時間
         
         error_log("Sending request to " . ($isClaudeModel ? 'Claude' : 'OpenAI') . " API");
+        $startTime = microtime(true);
         $response = curl_exec($ch);
-        if (curl_errno($ch)) {
-            error_log('[improveArticle] cURLエラー: ' . curl_error($ch));
-        } else {
-            error_log('[improveArticle] ' . ($isClaudeModel ? 'Claude' : 'OpenAI') . ' APIリクエスト正常終了');
-        }
-        
-        if (curl_errno($ch)) {
-            $curlError = curl_error($ch);
-            error_log("cURL error: " . $curlError);
-            curl_close($ch);
-            throw new Exception("APIリクエストエラー: " . $curlError);
-        }
+        $endTime = microtime(true);
+        $executionTime = $endTime - $startTime;
         
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        $curlErrno = curl_errno($ch);
+        
+        error_log("APIリクエスト実行時間: " . round($executionTime, 2) . "秒");
+        error_log("API response received. HTTP code: " . $httpCode);
+        
+        // タイムアウトエラーの特別処理
+        if ($curlErrno == CURLE_OPERATION_TIMEDOUT) {
+            error_log("APIリクエストがタイムアウトしました。実行時間: " . round($executionTime, 2) . "秒");
+            curl_close($ch);
+            
+            // タイムアウト時は、モデルを切り替えることを提案
+            return [
+                'error' => "タイムアウトエラーが発生しました。より高速なモデルを選択して再試行してください。",
+                'http_code' => 0,
+                'curl_error' => $curlError,
+                'curl_errno' => $curlErrno,
+                'execution_time' => round($executionTime, 2)
+            ];
+        }
+        
         curl_close($ch);
+        
+        // その他のエラー処理
+        if ($response === false || $httpCode >= 400) {
+            $errorMessage = "APIリクエストエラー: " . $curlError;
+            error_log("APIリクエストエラー: " . $curlError . " (" . $curlErrno . ")");
+            error_log("HTTPステータスコード: " . $httpCode);
+            
+            // レスポンスがあればログに出力
+            if ($response !== false) {
+                error_log("APIレスポンス: " . $response);
+            }
+            
+            return [
+                'error' => $errorMessage,
+                'http_code' => $httpCode,
+                'curl_error' => $curlError,
+                'curl_errno' => $curlErrno
+            ];
+        }
         
         error_log(($isClaudeModel ? 'Claude' : 'OpenAI') . " API response code: " . $httpCode);
         

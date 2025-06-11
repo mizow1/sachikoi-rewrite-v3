@@ -37,7 +37,7 @@ define('AI_MODELS', [
     'gpt-4o' => [
         'name' => 'GPT-4o',
         'provider' => 'openai',
-        'max_tokens' => 8000,
+        'max_tokens' => 10000,
         'temperature' => 0.7,
         'cost' => '安い',
         'speed' => '速い',
@@ -47,7 +47,7 @@ define('AI_MODELS', [
     'gpt-4o-mini' => [
         'name' => 'GPT-4o Mini',
         'provider' => 'openai',
-        'max_tokens' => 4000,
+        'max_tokens' => 10000,
         'temperature' => 0.7,
         'cost' => '最安',
         'speed' => '速い',

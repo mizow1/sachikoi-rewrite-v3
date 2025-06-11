@@ -1,93 +1,95 @@
 <?php
+require_once __DIR__ . '/includes/google/sheets.php';
+
 /**
  * スプレッドシートからデータを取得する関数
  * 
  * @return array スプレッドシートのデータ
  */
-function getSheetData() {
-    $spreadsheetId = SPREADSHEET_ID;
-    $sheetName = SHEET_NAME;
-    $useServiceAccount = defined('USE_SERVICE_ACCOUNT') ? USE_SERVICE_ACCOUNT : false;
-    $serviceAccountJson = defined('SERVICE_ACCOUNT_JSON') ? SERVICE_ACCOUNT_JSON : '';
+// function getSheetData() {
+//     $spreadsheetId = SPREADSHEET_ID;
+//     $sheetName = SHEET_NAME;
+//     $useServiceAccount = defined('USE_SERVICE_ACCOUNT') ? USE_SERVICE_ACCOUNT : false;
+//     $serviceAccountJson = defined('SERVICE_ACCOUNT_JSON') ? SERVICE_ACCOUNT_JSON : '';
     
-    // デバッグ情報を出力
-    error_log("Spreadsheet ID: " . $spreadsheetId);
-    error_log("Sheet Name: " . $sheetName);
-    error_log("Use Service Account: " . ($useServiceAccount ? 'true' : 'false'));
+//     // デバッグ情報を出力
+//     error_log("Spreadsheet ID: " . $spreadsheetId);
+//     error_log("Sheet Name: " . $sheetName);
+//     error_log("Use Service Account: " . ($useServiceAccount ? 'true' : 'false'));
     
-    if ($useServiceAccount && file_exists($serviceAccountJson)) {
-        // サービスアカウントを使用した認証
-        error_log("Using service account authentication with file: " . $serviceAccountJson);
+//     if ($useServiceAccount && file_exists($serviceAccountJson)) {
+//         // サービスアカウントを使用した認証
+//         error_log("Using service account authentication with file: " . $serviceAccountJson);
         
-        try {
-            // サービスアカウントのJSONファイルを読み込み
-            $serviceAccountData = json_decode(file_get_contents($serviceAccountJson), true);
+//         try {
+//             // サービスアカウントのJSONファイルを読み込み
+//             $serviceAccountData = json_decode(file_get_contents($serviceAccountJson), true);
             
-            if (!$serviceAccountData) {
-                error_log("Failed to parse service account JSON file");
-                throw new Exception("Failed to parse service account JSON file");
-            }
+//             if (!$serviceAccountData) {
+//                 error_log("Failed to parse service account JSON file");
+//                 throw new Exception("Failed to parse service account JSON file");
+//             }
             
-            // JWTトークンの生成は複雑なので、ここでは簡略して直接APIキーを使用する方法に切り替えます
-            error_log("Falling back to API key authentication");
-        } catch (Exception $e) {
-            error_log("Service account authentication error: " . $e->getMessage());
-            error_log("Falling back to API key authentication");
-        }
-    }
+//             // JWTトークンの生成は複雑なので、ここでは簡略して直接APIキーを使用する方法に切り替えます
+//             error_log("Falling back to API key authentication");
+//         } catch (Exception $e) {
+//             error_log("Service account authentication error: " . $e->getMessage());
+//             error_log("Falling back to API key authentication");
+//         }
+//     }
     
-    // APIキーを使用してスプレッドシートにアクセス
-    $apiKey = GOOGLE_SHEETS_API_KEY;
-    // シート名をURLエンコード
-    $encodedSheetName = urlencode($sheetName);
-    $url = "https://sheets.googleapis.com/v4/spreadsheets/{$spreadsheetId}/values/{$encodedSheetName}?key={$apiKey}";
-    error_log("API URL: " . $url);
-    error_log("Encoded Sheet Name: " . $encodedSheetName);
+//     // APIキーを使用してスプレッドシートにアクセス
+//     $apiKey = GOOGLE_SHEETS_API_KEY;
+//     // シート名をURLエンコード
+//     $encodedSheetName = urlencode($sheetName);
+//     $url = "https://sheets.googleapis.com/v4/spreadsheets/{$spreadsheetId}/values/{$encodedSheetName}?key={$apiKey}";
+//     error_log("API URL: " . $url);
+//     error_log("Encoded Sheet Name: " . $encodedSheetName);
     
-    // cURLを使用してAPIリクエスト
-    error_log('[getSheetData] cURLリクエスト開始');
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ（デバッグ用）
-    curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
-    $response = curl_exec($ch);
-    if (curl_errno($ch)) {
-        error_log('[getSheetData] cURLエラー: ' . curl_error($ch));
-        return [];
-    }
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    error_log("[getSheetData] HTTP Response Code: " . $httpCode);
-    error_log('[getSheetData] cURLリクエスト正常終了');
+//     // cURLを使用してAPIリクエスト
+//     error_log('[getSheetData] cURLリクエスト開始');
+//     $ch = curl_init();
+//     curl_setopt($ch, CURLOPT_URL, $url);
+//     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+//     curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+//     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
+//     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ（デバッグ用）
+//     curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+//     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
+//     $response = curl_exec($ch);
+//     if (curl_errno($ch)) {
+//         error_log('[getSheetData] cURLエラー: ' . curl_error($ch));
+//         return [];
+//     }
+//     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+//     error_log("[getSheetData] HTTP Response Code: " . $httpCode);
+//     error_log('[getSheetData] cURLリクエスト正常終了');
     
-    curl_close($ch);
+//     curl_close($ch);
     
-    // デバッグ用にレスポンスを出力
-    error_log("API Response: " . substr($response, 0, 1000)); // 長すぎる場合は切り詰める
+//     // デバッグ用にレスポンスを出力
+//     error_log("API Response: " . substr($response, 0, 1000)); // 長すぎる場合は切り詰める
     
-    // レスポンスをJSONからデコード
-    $data = json_decode($response, true);
+//     // レスポンスをJSONからデコード
+//     $data = json_decode($response, true);
     
-    if (isset($data['values'])) {
-        // ヘッダー行を削除（最初の行）
-        $rows = $data['values'];
-        $header = array_shift($rows);
-        error_log("Found " . count($rows) . " rows of data");
-        return $rows;
-    } else {
-        // エラーの詳細を記録
-        if (isset($data['error'])) {
-            error_log("API Error: " . json_encode($data['error']));
-        } else {
-            error_log("No values found in response");
-        }
-    }
+//     if (isset($data['values'])) {
+//         // ヘッダー行を削除（最初の行）
+//         $rows = $data['values'];
+//         $header = array_shift($rows);
+//         error_log("Found " . count($rows) . " rows of data");
+//         return $rows;
+//     } else {
+//         // エラーの詳細を記録
+//         if (isset($data['error'])) {
+//             error_log("API Error: " . json_encode($data['error']));
+//         } else {
+//             error_log("No values found in response");
+//         }
+//     }
     
-    return [];
-}
+//     return [];
+// }
 
 /**
  * JWT（JSON Web Token）を生成する関数
@@ -96,43 +98,43 @@ function getSheetData() {
  * @param string $clientEmail クライアントメール
  * @return string JWTトークン
  */
-function generateJWT($privateKey, $clientEmail) {
-    $now = time();
-    $exp = $now + 3600; // 1時間の有効期限
+// function generateJWT($privateKey, $clientEmail) {
+//     $now = time();
+//     $exp = $now + 3600; // 1時間の有効期限
     
-    // JWTヘッダー
-    $header = [
-        'alg' => 'RS256',
-        'typ' => 'JWT'
-    ];
+//     // JWTヘッダー
+//     $header = [
+//         'alg' => 'RS256',
+//         'typ' => 'JWT'
+//     ];
     
-    // JWTクレーム
-    $payload = [
-        'iss' => $clientEmail,
-        'scope' => 'https://www.googleapis.com/auth/spreadsheets',
-        'aud' => 'https://oauth2.googleapis.com/token',
-        'exp' => $exp,
-        'iat' => $now
-    ];
+//     // JWTクレーム
+//     $payload = [
+//         'iss' => $clientEmail,
+//         'scope' => 'https://www.googleapis.com/auth/spreadsheets',
+//         'aud' => 'https://oauth2.googleapis.com/token',
+//         'exp' => $exp,
+//         'iat' => $now
+//     ];
     
-    // Base64Urlエンコード
-    $base64UrlHeader = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode($header)));
-    $base64UrlPayload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode($payload)));
+//     // Base64Urlエンコード
+//     $base64UrlHeader = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode($header)));
+//     $base64UrlPayload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode($payload)));
     
-    // 署名対象文字列
-    $signatureInput = $base64UrlHeader . '.' . $base64UrlPayload;
+//     // 署名対象文字列
+//     $signatureInput = $base64UrlHeader . '.' . $base64UrlPayload;
     
-    // 署名を生成
-    $privateKeyId = openssl_pkey_get_private($privateKey);
-    openssl_sign($signatureInput, $signature, $privateKeyId, 'SHA256');
-    openssl_free_key($privateKeyId);
+//     // 署名を生成
+//     $privateKeyId = openssl_pkey_get_private($privateKey);
+//     openssl_sign($signatureInput, $signature, $privateKeyId, 'SHA256');
+//     openssl_free_key($privateKeyId);
     
-    // Base64Urlエンコードされた署名
-    $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
+//     // Base64Urlエンコードされた署名
+//     $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
     
-    // JWTを組み立てる
-    return $base64UrlHeader . '.' . $base64UrlPayload . '.' . $base64UrlSignature;
-}
+//     // JWTを組み立てる
+//     return $base64UrlHeader . '.' . $base64UrlPayload . '.' . $base64UrlSignature;
+// }
 
 /**
  * サービスアカウントを使用してアクセストークンを取得する関数
@@ -140,68 +142,68 @@ function generateJWT($privateKey, $clientEmail) {
  * @param string $serviceAccountJson サービスアカウントのJSONファイルパス
  * @return string|アクセストークンまたはnull
  */
-function getAccessToken($serviceAccountJson) {
-    try {
-        // サービスアカウントのJSONファイルを読み込み
-        $serviceAccount = json_decode(file_get_contents($serviceAccountJson), true);
+// function getAccessToken($serviceAccountJson) {
+//     try {
+//         // サービスアカウントのJSONファイルを読み込み
+//         $serviceAccount = json_decode(file_get_contents($serviceAccountJson), true);
         
-        if (!$serviceAccount) {
-            error_log("Failed to parse service account JSON file");
-            return null;
-        }
+//         if (!$serviceAccount) {
+//             error_log("Failed to parse service account JSON file");
+//             return null;
+//         }
         
-        // 必要な情報を取得
-        $privateKey = $serviceAccount['private_key'];
-        $clientEmail = $serviceAccount['client_email'];
+//         // 必要な情報を取得
+//         $privateKey = $serviceAccount['private_key'];
+//         $clientEmail = $serviceAccount['client_email'];
         
-        // JWTを生成
-        $jwt = generateJWT($privateKey, $clientEmail);
+//         // JWTを生成
+//         $jwt = generateJWT($privateKey, $clientEmail);
         
-        // アクセストークンを取得するリクエスト
-        error_log('[getAccessToken] アクセストークン取得リクエスト開始');
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, 'https://oauth2.googleapis.com/token');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
-            'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-            'assertion' => $jwt
-        ]));
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ（デバッグ用）
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
+//         // アクセストークンを取得するリクエスト
+//         error_log('[getAccessToken] アクセストークン取得リクエスト開始');
+//         $ch = curl_init();
+//         curl_setopt($ch, CURLOPT_URL, 'https://oauth2.googleapis.com/token');
+//         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+//         curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+//         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
+//         curl_setopt($ch, CURLOPT_POST, true);
+//         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+//             'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+//             'assertion' => $jwt
+//         ]));
+//         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ（デバッグ用）
+//         curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+//         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
         
-        $response = curl_exec($ch);
-        if (curl_errno($ch)) {
-            error_log('[getAccessToken] cURLエラー: ' . curl_error($ch));
-        } else {
-            error_log('[getAccessToken] アクセストークン取得リクエスト正常終了');
-        }
-        if (curl_errno($ch)) {
-            error_log('Curl error when getting access token: ' . curl_error($ch));
-            curl_close($ch);
-            return null;
-        }
+//         $response = curl_exec($ch);
+//         if (curl_errno($ch)) {
+//             error_log('[getAccessToken] cURLエラー: ' . curl_error($ch));
+//         } else {
+//             error_log('[getAccessToken] アクセストークン取得リクエスト正常終了');
+//         }
+//         if (curl_errno($ch)) {
+//             error_log('Curl error when getting access token: ' . curl_error($ch));
+//             curl_close($ch);
+//             return null;
+//         }
         
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+//         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+//         curl_close($ch);
         
-        if ($httpCode != 200) {
-            error_log("Failed to get access token. HTTP code: " . $httpCode);
-            error_log("Response: " . substr($response, 0, 1000));
-            return null;
-        }
+//         if ($httpCode != 200) {
+//             error_log("Failed to get access token. HTTP code: " . $httpCode);
+//             error_log("Response: " . substr($response, 0, 1000));
+//             return null;
+//         }
         
-        $tokenData = json_decode($response, true);
-        return $tokenData['access_token'] ?? null;
+//         $tokenData = json_decode($response, true);
+//         return $tokenData['access_token'] ?? null;
         
-    } catch (Exception $e) {
-        error_log("Error getting access token: " . $e->getMessage());
-        return null;
-    }
-}
+//     } catch (Exception $e) {
+//         error_log("Error getting access token: " . $e->getMessage());
+//         return null;
+//     }
+// }
 
 /**
  * スプレッドシートにデータを書き込む関数
@@ -210,106 +212,106 @@ function getAccessToken($serviceAccountJson) {
  * @param array $values 書き込むデータの配列
  * @return bool 成功したかどうか
  */
-function writeToSheet($range, $values) {
-    $spreadsheetId = SPREADSHEET_ID;
-    $sheetName = SHEET_NAME;
-    $useServiceAccount = defined('USE_SERVICE_ACCOUNT') ? USE_SERVICE_ACCOUNT : false;
-    $serviceAccountJson = defined('SERVICE_ACCOUNT_JSON') ? SERVICE_ACCOUNT_JSON : '';
+// function writeToSheet($range, $values) {
+//     $spreadsheetId = SPREADSHEET_ID;
+//     $sheetName = SHEET_NAME;
+//     $useServiceAccount = defined('USE_SERVICE_ACCOUNT') ? USE_SERVICE_ACCOUNT : false;
+//     $serviceAccountJson = defined('SERVICE_ACCOUNT_JSON') ? SERVICE_ACCOUNT_JSON : '';
     
-    // シート名をURLエンコード
-    $encodedSheetName = urlencode($sheetName);
-    $fullRange = $encodedSheetName . '!' . $range;
+//     // シート名をURLエンコード
+//     $encodedSheetName = urlencode($sheetName);
+//     $fullRange = $encodedSheetName . '!' . $range;
     
-    // デバッグ情報
-    error_log("Write API URL base: https://sheets.googleapis.com/v4/spreadsheets/{$spreadsheetId}/values/{$fullRange}");
-    error_log("Encoded Sheet Name: " . $encodedSheetName);
-    error_log("Use Service Account: " . ($useServiceAccount ? 'true' : 'false'));
+//     // デバッグ情報
+//     error_log("Write API URL base: https://sheets.googleapis.com/v4/spreadsheets/{$spreadsheetId}/values/{$fullRange}");
+//     error_log("Encoded Sheet Name: " . $encodedSheetName);
+//     error_log("Use Service Account: " . ($useServiceAccount ? 'true' : 'false'));
     
-    // リクエストボディ
-    $bodyArray = ['values' => $values];
-    $body = json_encode($bodyArray, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+//     // リクエストボディ
+//     $bodyArray = ['values' => $values];
+//     $body = json_encode($bodyArray, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        error_log('JSON encoding error: ' . json_last_error_msg());
-        // JSONエンコードエラーの詳細をログに出力
-        error_log('Failed to encode data: ' . print_r($bodyArray, true));
-        return false;
-    }
+//     if (json_last_error() !== JSON_ERROR_NONE) {
+//         error_log('JSON encoding error: ' . json_last_error_msg());
+//         // JSONエンコードエラーの詳細をログに出力
+//         error_log('Failed to encode data: ' . print_r($bodyArray, true));
+//         return false;
+//     }
     
-    // データサイズの確認
-    $bodySize = strlen($body);
-    error_log("Request body size: " . $bodySize . " bytes");
+//     // データサイズの確認
+//     $bodySize = strlen($body);
+//     error_log("Request body size: " . $bodySize . " bytes");
     
-    // Google Sheets APIのリクエストサイズ制限（10MB）を確認
-    if ($bodySize > 10 * 1024 * 1024) {
-        error_log("Request body too large: " . $bodySize . " bytes");
-        return false;
-    }
+//     // Google Sheets APIのリクエストサイズ制限（10MB）を確認
+//     if ($bodySize > 10 * 1024 * 1024) {
+//         error_log("Request body too large: " . $bodySize . " bytes");
+//         return false;
+//     }
     
-    $accessToken = null;
-    $apiUrl = "https://sheets.googleapis.com/v4/spreadsheets/{$spreadsheetId}/values/{$fullRange}?valueInputOption=USER_ENTERED";
+//     $accessToken = null;
+//     $apiUrl = "https://sheets.googleapis.com/v4/spreadsheets/{$spreadsheetId}/values/{$fullRange}?valueInputOption=USER_ENTERED";
     
-    // サービスアカウントを使用した認証
-    if ($useServiceAccount && file_exists($serviceAccountJson)) {
-        error_log("Using service account authentication with file: " . $serviceAccountJson);
-        $accessToken = getAccessToken($serviceAccountJson);
+//     // サービスアカウントを使用した認証
+//     if ($useServiceAccount && file_exists($serviceAccountJson)) {
+//         error_log("Using service account authentication with file: " . $serviceAccountJson);
+//         $accessToken = getAccessToken($serviceAccountJson);
         
-        if (!$accessToken) {
-            error_log("Failed to get access token from service account");
-            return false;
-        }
+//         if (!$accessToken) {
+//             error_log("Failed to get access token from service account");
+//             return false;
+//         }
         
-        error_log("Successfully obtained access token");
-    } else {
-        error_log("Service account not configured or file not found. Using API key instead.");
-        $apiUrl .= "&key=" . GOOGLE_SHEETS_API_KEY;
-    }
+//         error_log("Successfully obtained access token");
+//     } else {
+//         error_log("Service account not configured or file not found. Using API key instead.");
+//         $apiUrl .= "&key=" . GOOGLE_SHEETS_API_KEY;
+//     }
     
-    error_log("Final API URL: " . $apiUrl);
+//     error_log("Final API URL: " . $apiUrl);
     
-    // cURLを使用してAPIリクエスト（PUT）
-    error_log('[writeToSheet] Google Sheets APIリクエスト開始');
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $apiUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+//     // cURLを使用してAPIリクエスト（PUT）
+//     error_log('[writeToSheet] Google Sheets APIリクエスト開始');
+//     $ch = curl_init();
+//     curl_setopt($ch, CURLOPT_URL, $apiUrl);
+//     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+//     curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+//     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
+//     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
+//     curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
     
-    $headers = ['Content-Type: application/json', 'Content-Length: ' . $bodySize];
+//     $headers = ['Content-Type: application/json', 'Content-Length: ' . $bodySize];
     
-    // アクセストークンがあれば追加
-    if ($accessToken) {
-        $headers[] = 'Authorization: Bearer ' . $accessToken;
-    }
+//     // アクセストークンがあれば追加
+//     if ($accessToken) {
+//         $headers[] = 'Authorization: Bearer ' . $accessToken;
+//     }
     
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ（デバッグ用）
-    curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
+//     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+//     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL証明書の検証をスキップ（デバッグ用）
+//     curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
+//     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
     
-    $response = curl_exec($ch);
-    if (curl_errno($ch)) {
-        error_log('[writeToSheet] cURLエラー: ' . curl_error($ch));
-    } else {
-        error_log('[writeToSheet] Google Sheets APIリクエスト正常終了');
-    }
-    if (curl_errno($ch)) {
-        error_log('Curl error: ' . curl_error($ch));
-        curl_close($ch);
-        return false;
-    }
+//     $response = curl_exec($ch);
+//     if (curl_errno($ch)) {
+//         error_log('[writeToSheet] cURLエラー: ' . curl_error($ch));
+//     } else {
+//         error_log('[writeToSheet] Google Sheets APIリクエスト正常終了');
+//     }
+//     if (curl_errno($ch)) {
+//         error_log('Curl error: ' . curl_error($ch));
+//         curl_close($ch);
+//         return false;
+//     }
     
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+//     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+//     curl_close($ch);
     
-    // レスポンスの詳細をログに出力
-    error_log("Sheets API write response code: " . $httpCode);
-    error_log("Sheets API write response: " . substr($response, 0, 1000));
+//     // レスポンスの詳細をログに出力
+//     error_log("Sheets API write response code: " . $httpCode);
+//     error_log("Sheets API write response: " . substr($response, 0, 1000));
     
-    return ($httpCode >= 200 && $httpCode < 300);
-}
+//     return ($httpCode >= 200 && $httpCode < 300);
+// }
 
 /**
  * リライト回数を計算する関数
@@ -633,7 +635,7 @@ function analyzeArticleIssues($title, $description, $content) {
         curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 最大60秒でタイムアウト
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 接続確立は最大10秒
         curl_setopt($ch, CURLOPT_POST, true);
-        $jsonData = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        $jsonData = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($jsonData === false) {
             $jsonError = json_last_error_msg();
             error_log("[analyzeArticleIssues] json_encode failed: " . $jsonError);

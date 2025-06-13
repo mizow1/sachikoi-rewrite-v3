@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/google/sheets.php';
 require_once __DIR__ . '/includes/api/openai.php';
+require_once __DIR__ . '/includes/api/gemini.php';
 
 /**
  * スプレッドシートからデータを取得する関数

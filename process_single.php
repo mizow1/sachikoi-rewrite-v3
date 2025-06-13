@@ -76,11 +76,19 @@ if ($elapsedTime > $maxProcessTime) {
 if ($originalArticle) {
     try {
         // 問題点を分析
-        $issues = analyzeArticleIssues(
-            $originalArticle['title'],
-            $originalArticle['description'],
-            $originalArticle['content']
-        );
+        if ($aiModel === 'gemini-pro') {
+            $issues = analyzeArticleIssuesGemini(
+                $originalArticle['title'],
+                $originalArticle['description'],
+                $originalArticle['content']
+            );
+        } else {
+            $issues = analyzeArticleIssues(
+                $originalArticle['title'],
+                $originalArticle['description'],
+                $originalArticle['content']
+            );
+        }
         
         // analyzeArticleIssuesのエラー判定
         if (strpos($issues, 'エラーが発生しました') !== false || strpos($issues, 'APIエラーが発生しました') !== false) {
@@ -109,13 +117,21 @@ if ($originalArticle) {
         }
         
         // 記事を改善
-        $improvedArticle = improveArticle(
-            $originalArticle['title'],
-            $originalArticle['description'],
-            $originalArticle['content'],
-            $issues,
-            $aiModel // セッションから取得したAIモデルを渡す
-        );
+        if ($aiModel === 'gemini-pro') {
+            $improvedArticle = improveArticleGemini(
+                $originalArticle['title'],
+                $originalArticle['description'],
+                $originalArticle['content'],
+                $issues
+            );
+        } else {
+            $improvedArticle = improveArticle(
+                $originalArticle['title'],
+                $originalArticle['description'],
+                $originalArticle['content'],
+                $issues
+            );
+        }
         
         // 改善後の処理時間をチェック
         $currentTime = microtime(true);

@@ -83,6 +83,16 @@ define('AI_MODELS', [
         'speed' => '遅い',
         'quality' => '最高',
         'description' => 'Anthropicの最高品質モデル。複雑な分析と長文生成に最適。'
+    ],
+    'gemini-2.0-flash' => [
+        'name' => 'gemini-2.0-flash',
+        'provider' => 'google',
+        'max_tokens' => 8192,
+        'temperature' => 0.7,
+        'cost' => '安い',
+        'speed' => '速い',
+        'quality' => '高い',
+        'description' => 'Google Geminiの短文生成モデル。'
     ]
 ]);
 

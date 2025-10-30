@@ -15,10 +15,10 @@ if (!defined('GEMINI_API_VERSION')) {
     define('GEMINI_API_VERSION', $ver);
 }
 
-// 利用モデル名（例: gemini-1.5-pro）。公式ドキュメントに沿って環境変数で変更可。
+// 利用モデル名（例: gemini-2.0-flash）。環境変数で必ず設定すること。
 if (!defined('GEMINI_MODEL')) {
     $model = getenv('GEMINI_MODEL');
-    if (!$model) { $model = 'gemini-1.5-pro'; }
+    if (!$model) { $model = ''; }
     define('GEMINI_MODEL', $model);
 }
 
@@ -33,12 +33,20 @@ if (!defined('GEMINI_MODEL')) {
  */
 function geminiGenerateContent($systemPrompt, $userPrompt, $maxTokens = 1024, $temperature = 0.7) {
     $apiKey = GEMINI_API_KEY;
-    if (!$apiKey) {
-        error_log('GEMINI_API_KEY が設定されていません。');
-        return 'Gemini APIキーが設定されていません。';
+    $model = GEMINI_MODEL;
+
+    // APIキーとモデルの検証
+    if (empty($apiKey)) {
+        error_log('GEMINI_API_KEY が .env ファイルに設定されていません。');
+        return 'エラー: GEMINI_API_KEY が .env ファイルに設定されていません。環境変数を確認してください。';
     }
 
-    $url = 'https://generativelanguage.googleapis.com/' . GEMINI_API_VERSION . '/models/' . rawurlencode(GEMINI_MODEL) . ':generateContent?key=' . urlencode($apiKey);
+    if (empty($model)) {
+        error_log('GEMINI_MODEL が .env ファイルに設定されていません。');
+        return 'エラー: GEMINI_MODEL が .env ファイルに設定されていません。環境変数を確認してください。';
+    }
+
+    $url = 'https://generativelanguage.googleapis.com/' . GEMINI_API_VERSION . '/models/' . rawurlencode($model) . ':generateContent?key=' . urlencode($apiKey);
 
     // Google Generative Language API の期待フォーマット
     $requestBody = [

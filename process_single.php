@@ -75,14 +75,23 @@ if ($elapsedTime > $maxProcessTime) {
 
 if ($originalArticle) {
     try {
+        // 選択されたモデルのプロバイダーを取得
+        $availableModels = defined('AVAILABLE_MODELS') ? AVAILABLE_MODELS : [];
+        $modelProvider = 'openai'; // デフォルトはOpenAI
+
+        if (isset($availableModels[$aiModel]['provider'])) {
+            $modelProvider = $availableModels[$aiModel]['provider'];
+        }
+
         // 問題点を分析
-        if ($aiModel === 'gemini-pro') {
+        if ($modelProvider === 'google') {
             $issues = analyzeArticleIssuesGemini(
                 $originalArticle['title'],
                 $originalArticle['description'],
                 $originalArticle['content']
             );
         } else {
+            // OpenAIまたはその他のプロバイダー
             $issues = analyzeArticleIssues(
                 $originalArticle['title'],
                 $originalArticle['description'],
@@ -117,7 +126,7 @@ if ($originalArticle) {
         }
         
         // 記事を改善
-        if ($aiModel === 'gemini-pro') {
+        if ($modelProvider === 'google') {
             $improvedArticle = improveArticleGemini(
                 $originalArticle['title'],
                 $originalArticle['description'],
@@ -125,6 +134,7 @@ if ($originalArticle) {
                 $issues
             );
         } else {
+            // OpenAIまたはその他のプロバイダー
             $improvedArticle = improveArticle(
                 $originalArticle['title'],
                 $originalArticle['description'],

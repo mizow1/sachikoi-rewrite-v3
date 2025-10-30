@@ -13,8 +13,19 @@
  */
 function analyzeArticleIssues($title, $description, $content) {
     $apiKey = OPENAI_API_KEY;
-    $model = defined('OPENAI_MODEL') ? OPENAI_MODEL : 'gpt-3.5-turbo';
-    
+    $model = defined('OPENAI_MODEL') ? OPENAI_MODEL : '';
+
+    // APIキーとモデルの検証
+    if (empty($apiKey)) {
+        error_log('OPENAI_API_KEY が .env ファイルに設定されていません。');
+        return "エラー: OPENAI_API_KEY が .env ファイルに設定されていません。環境変数を確認してください。";
+    }
+
+    if (empty($model)) {
+        error_log('OPENAI_MODEL が .env ファイルに設定されていません。');
+        return "エラー: OPENAI_MODEL が .env ファイルに設定されていません。環境変数を確認してください。";
+    }
+
     // HTMLタグを除去してプレーンテキストに変換
     $plainContent = strip_tags($content);
     
@@ -99,8 +110,27 @@ function analyzeArticleIssues($title, $description, $content) {
  */
 function improveArticle($title, $description, $content, $issues) {
     $apiKey = OPENAI_API_KEY;
-    $model = defined('OPENAI_MODEL') ? OPENAI_MODEL : 'gpt-3.5-turbo';
-    
+    $model = defined('OPENAI_MODEL') ? OPENAI_MODEL : '';
+
+    // APIキーとモデルの検証
+    if (empty($apiKey)) {
+        error_log('OPENAI_API_KEY が .env ファイルに設定されていません。');
+        return [
+            'title' => $title,
+            'description' => $description,
+            'content' => "<p>エラー: OPENAI_API_KEY が .env ファイルに設定されていません。環境変数を確認してください。</p>"
+        ];
+    }
+
+    if (empty($model)) {
+        error_log('OPENAI_MODEL が .env ファイルに設定されていません。');
+        return [
+            'title' => $title,
+            'description' => $description,
+            'content' => "<p>エラー: OPENAI_MODEL が .env ファイルに設定されていません。環境変数を確認してください。</p>"
+        ];
+    }
+
     // HTMLタグを除去してプレーンテキストに変換
     $plainContent = strip_tags($content);
     

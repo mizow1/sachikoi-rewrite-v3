@@ -31,6 +31,10 @@ define('USE_SERVICE_ACCOUNT', getenv('USE_SERVICE_ACCOUNT') === 'true');
 define('OPENAI_API_KEY', getenv('OPENAI_API_KEY'));
 define('OPENAI_MODEL', getenv('OPENAI_MODEL'));
 
+// Gemini API設定
+define('GEMINI_API_KEY', getenv('GEMINI_API_KEY'));
+define('GEMINI_MODEL', getenv('GEMINI_MODEL'));
+
 // AIモデル設定
 // モデル名、プロバイダ、トークン制限、温度、料金情報を定義
 define('AI_MODELS', [
@@ -98,6 +102,41 @@ define('AI_MODELS', [
 
 // デフォルトAIモデル設定
 define('DEFAULT_AI_MODEL', 'gpt-4o');
+
+// .envから利用可能なモデルを動的に取得
+$availableModels = [];
+
+// OpenAIモデルが設定されている場合
+if (!empty(OPENAI_API_KEY) && !empty(OPENAI_MODEL)) {
+    $openaiModel = OPENAI_MODEL;
+    if (isset(AI_MODELS[$openaiModel])) {
+        $availableModels[$openaiModel] = AI_MODELS[$openaiModel];
+    } else {
+        // AI_MODELSに定義がない場合は基本情報を追加
+        $availableModels[$openaiModel] = [
+            'name' => $openaiModel,
+            'provider' => 'openai',
+            'description' => 'OpenAI モデル (.envで設定)'
+        ];
+    }
+}
+
+// Geminiモデルが設定されている場合
+if (!empty(GEMINI_API_KEY) && !empty(GEMINI_MODEL)) {
+    $geminiModel = GEMINI_MODEL;
+    if (isset(AI_MODELS[$geminiModel])) {
+        $availableModels[$geminiModel] = AI_MODELS[$geminiModel];
+    } else {
+        // AI_MODELSに定義がない場合は基本情報を追加
+        $availableModels[$geminiModel] = [
+            'name' => $geminiModel,
+            'provider' => 'google',
+            'description' => 'Google Gemini モデル (.envで設定)'
+        ];
+    }
+}
+
+define('AVAILABLE_MODELS', $availableModels);
 
 // タイムゾーン設定
 date_default_timezone_set('Asia/Tokyo');

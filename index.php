@@ -261,25 +261,28 @@ $pageTitle = "記事リライトツール";
                         <label for="ai_model">使用するAI:</label>
                         <select name="ai_model" id="ai_model">
                             <?php
-                            // config.phpで定義されたAI_MODELSを使用
-                            $aiModels = defined('AI_MODELS') ? AI_MODELS : [
-                                'gpt-4o' => ['name' => 'GPT-4o', 'cost' => '高い', 'speed' => '標準', 'quality' => '最高', 'description' => 'OpenAIの最新モデル']
-                            ];
-                            
-                            foreach ($aiModels as $modelId => $modelInfo): 
-                                $selected = ($modelId === (defined('DEFAULT_AI_MODEL') ? DEFAULT_AI_MODEL : 'gpt-4o')) ? 'selected' : '';
-                                $tooltip = "品質: {$modelInfo['quality']} | 速度: {$modelInfo['speed']} | コスト: {$modelInfo['cost']}";
+                            // .envから読み込んだ利用可能なモデルのみ表示
+                            $availableModels = defined('AVAILABLE_MODELS') ? AVAILABLE_MODELS : [];
+
+                            if (empty($availableModels)) {
+                                echo '<option value="">モデルが設定されていません (.envを確認)</option>';
+                            } else {
+                                $firstModel = array_key_first($availableModels);
+                                foreach ($availableModels as $modelId => $modelInfo):
+                                    $selected = ($modelId === $firstModel) ? 'selected' : '';
+                                    $displayName = isset($modelInfo['name']) ? $modelInfo['name'] : $modelId;
+                                    $description = isset($modelInfo['description']) ? $modelInfo['description'] : '';
+                                    $provider = isset($modelInfo['provider']) ? $modelInfo['provider'] : 'unknown';
+                                ?>
+                                    <option value="<?php echo htmlspecialchars($modelId); ?>"
+                                            data-provider="<?php echo htmlspecialchars($provider); ?>"
+                                            data-description="<?php echo htmlspecialchars($description); ?>"
+                                            <?php echo $selected; ?>>
+                                        <?php echo htmlspecialchars($displayName); ?> (<?php echo htmlspecialchars($provider); ?>)
+                                    </option>
+                                <?php endforeach;
+                            }
                             ?>
-                                <option value="<?php echo $modelId; ?>" 
-                                        title="<?php echo htmlspecialchars($tooltip); ?>" 
-                                        data-description="<?php echo htmlspecialchars($modelInfo['description']); ?>"
-                                        data-quality="<?php echo htmlspecialchars($modelInfo['quality']); ?>"
-                                        data-speed="<?php echo htmlspecialchars($modelInfo['speed']); ?>"
-                                        data-cost="<?php echo htmlspecialchars($modelInfo['cost']); ?>"
-                                        <?php echo $selected; ?>>
-                                    <?php echo htmlspecialchars($modelInfo['name']); ?>
-                                </option>
-                            <?php endforeach; ?>
                         </select>
                         <div id="model-info" class="model-info-tooltip"></div>
                     </div>

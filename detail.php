@@ -184,8 +184,38 @@ $pageTitle = "記事詳細: " . htmlspecialchars($url);
         <main>
             <div class="detail-header">
                 <h2><?php echo htmlspecialchars($url); ?></h2>
-                <form action="process.php" method="post">
+                <form action="process.php" method="post" style="display: flex; align-items: center; gap: 15px;">
                     <input type="hidden" name="selected_urls[]" value="<?php echo htmlspecialchars($url); ?>">
+
+                    <div class="ai-selection">
+                        <label for="ai_model">使用するAI:</label>
+                        <select name="ai_model" id="ai_model">
+                            <?php
+                            // .envから読み込んだ利用可能なモデルのみ表示
+                            $availableModels = defined('AVAILABLE_MODELS') ? AVAILABLE_MODELS : [];
+
+                            if (empty($availableModels)) {
+                                echo '<option value="">モデルが設定されていません (.envを確認)</option>';
+                            } else {
+                                $firstModel = array_key_first($availableModels);
+                                foreach ($availableModels as $modelId => $modelInfo):
+                                    $selected = ($modelId === $firstModel) ? 'selected' : '';
+                                    $displayName = isset($modelInfo['name']) ? $modelInfo['name'] : $modelId;
+                                    $description = isset($modelInfo['description']) ? $modelInfo['description'] : '';
+                                    $provider = isset($modelInfo['provider']) ? $modelInfo['provider'] : 'unknown';
+                                ?>
+                                    <option value="<?php echo htmlspecialchars($modelId); ?>"
+                                            data-provider="<?php echo htmlspecialchars($provider); ?>"
+                                            data-description="<?php echo htmlspecialchars($description); ?>"
+                                            <?php echo $selected; ?>>
+                                        <?php echo htmlspecialchars($displayName); ?> (<?php echo htmlspecialchars($provider); ?>)
+                                    </option>
+                                <?php endforeach;
+                            }
+                            ?>
+                        </select>
+                    </div>
+
                     <button type="submit" class="btn btn-primary">この記事をリライト</button>
                 </form>
             </div>

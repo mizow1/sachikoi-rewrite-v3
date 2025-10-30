@@ -150,6 +150,7 @@ function improveArticleGemini($title, $description, $content, $issues) {
                     "5. h1は本文前に既に表示されているので作成しない\n" .
                     "6. この記事にはコメント欄がないためコメントを促さない\n" .
                     "7. 目次を作成しない\n" .
+                    "8. 1万文字以上で作成\n" .
                     "JSONのみを出力し、他の説明は禁止です。\n" .
                     "本文(content)はHTMLとして<p>タグなどを維持し、句点のあとには常に<br>を挿入してください。";
 

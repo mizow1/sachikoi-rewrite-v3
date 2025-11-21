@@ -6,7 +6,7 @@ require_once 'functions.php';
 $results = isset($_SESSION['rewrite_results']) ? $_SESSION['rewrite_results'] : [];
 
 // 使用したAIモデルを取得
-$aiModel = isset($_SESSION['ai_model']) ? $_SESSION['ai_model'] : 'gpt-4o';
+$aiModel = isset($_SESSION['ai_model']) ? $_SESSION['ai_model'] : 'gpt-5-mini';
 
 // 結果が空の場合はトップページにリダイレクト
 if (empty($results)) {

@@ -15,7 +15,7 @@ $total = count($processingUrls);
 $progress = ($total > 0) ? floor(($currentIndex / $total) * 100) : 0;
 
 // 選択されたAIモデルを取得
-$aiModel = isset($_SESSION['ai_model']) ? $_SESSION['ai_model'] : 'gpt-4o';
+$aiModel = isset($_SESSION['ai_model']) ? $_SESSION['ai_model'] : 'gpt-5-mini';
 
 // ページタイトル
 $pageTitle = "処理中...";

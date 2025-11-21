@@ -26,7 +26,7 @@ if (!isset($_SESSION['processing_urls']) || !isset($_SESSION['current_index'])) 
 $processingUrls = $_SESSION['processing_urls'];
 $currentIndex = $_SESSION['current_index'];
 $results = isset($_SESSION['results']) ? $_SESSION['results'] : [];
-$aiModel = isset($_SESSION['ai_model']) ? $_SESSION['ai_model'] : 'gpt-4o';
+$aiModel = isset($_SESSION['ai_model']) ? $_SESSION['ai_model'] : 'gpt-5-mini';
 
 // 選択されたAIモデルをグローバル変数として定義（関数内で使用するため）
 define('SELECTED_AI_MODEL', $aiModel);

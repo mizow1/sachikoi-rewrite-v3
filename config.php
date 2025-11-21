@@ -38,6 +38,16 @@ define('GEMINI_MODEL', getenv('GEMINI_MODEL'));
 // AIモデル設定
 // モデル名、プロバイダ、トークン制限、温度、料金情報を定義
 define('AI_MODELS', [
+    'gpt-5-mini' => [
+        'name' => 'GPT-5 Mini',
+        'provider' => 'openai',
+        'max_tokens' => 10000,
+        'temperature' => 0.7,
+        'cost' => '最安',
+        'speed' => '高速',
+        'quality' => '高い',
+        'description' => 'GPT-5の軽量版。高速で高品質な記事生成が可能。'
+    ],
     'gpt-4o' => [
         'name' => 'GPT-4o',
         'provider' => 'openai',
@@ -101,7 +111,7 @@ define('AI_MODELS', [
 ]);
 
 // デフォルトAIモデル設定
-define('DEFAULT_AI_MODEL', 'gpt-4o');
+define('DEFAULT_AI_MODEL', 'gpt-5-mini');
 
 // .envから利用可能なモデルを動的に取得
 $availableModels = [];

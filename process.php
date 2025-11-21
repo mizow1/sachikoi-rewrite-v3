@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     // 選択されたAIモデルを取得
-    $aiModel = isset($_POST['ai_model']) ? $_POST['ai_model'] : 'gpt-4o';
+    $aiModel = isset($_POST['ai_model']) ? $_POST['ai_model'] : 'gpt-5-mini';
     
     // 処理を軸に分割して実行するためのパラメータをセッションに保存
     $_SESSION['processing_urls'] = $selectedUrls;

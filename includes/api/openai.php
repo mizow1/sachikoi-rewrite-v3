@@ -51,25 +51,50 @@ function analyzeArticleIssues($title, $description, $content) {
     $userPrompt .= "【メタディスクリプション】\n" . $description . "\n\n";
     $userPrompt .= "【本文】\n" . $plainContent;
     
-    // APIリクエストデータ
-    $requestData = [
-        'model' => $model,
-        'messages' => [
-            [
-                'role' => 'system',
-                'content' => $systemPrompt
+    // gpt-5-mini用のResponses APIとその他のモデル用のChat Completions APIを判別
+    $isGpt5Mini = (strpos($model, 'gpt-5') === 0);
+
+    if ($isGpt5Mini) {
+        // Responses API用のリクエストデータ（gpt-5-mini）
+        $combinedPrompt = $systemPrompt . "\n\n" . $userPrompt;
+        $requestData = [
+            'model' => $model,
+            'input' => [
+                [
+                    'role' => 'user',
+                    'content' => [
+                        [
+                            'type' => 'input_text',
+                            'text' => $combinedPrompt
+                        ]
+                    ]
+                ]
             ],
-            [
-                'role' => 'user',
-                'content' => $userPrompt
-            ]
-        ],
-        'temperature' => 0.7,
-        'max_tokens' => 1000
-    ];
-    
+            'max_output_tokens' => 1000
+        ];
+        $endpoint = 'https://api.openai.com/v1/responses';
+    } else {
+        // Chat Completions API用のリクエストデータ（gpt-4o等）
+        $requestData = [
+            'model' => $model,
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => $systemPrompt
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $userPrompt
+                ]
+            ],
+            'temperature' => 0.7,
+            'max_tokens' => 1000
+        ];
+        $endpoint = 'https://api.openai.com/v1/chat/completions';
+    }
+
     // APIリクエスト
-    $ch = curl_init('https://api.openai.com/v1/chat/completions');
+    $ch = curl_init($endpoint);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($requestData));
@@ -79,24 +104,50 @@ function analyzeArticleIssues($title, $description, $content) {
     ]);
     
     $response = curl_exec($ch);
-    
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+    // デバッグ用：レスポンスをログファイルに記録
+    $logDir = __DIR__ . '/../../logs';
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+    $logFile = $logDir . '/openai_' . date('Ymd') . '.log';
+    $logMessage = date('Y-m-d H:i:s') . " [analyzeArticleIssues] HTTP Code: $httpCode, Model: $model, Response: " . substr($response, 0, 500) . "\n";
+    @file_put_contents($logFile, $logMessage, FILE_APPEND);
+
     if (curl_errno($ch)) {
         error_log('Curl error: ' . curl_error($ch));
         curl_close($ch);
         return "APIエラーが発生しました。詳細はログを確認してください。";
     }
-    
+
     curl_close($ch);
-    
+
     // レスポンスをJSONからデコード
     $data = json_decode($response, true);
-    
-    if (isset($data['choices'][0]['message']['content'])) {
-        return $data['choices'][0]['message']['content'];
+
+    // gpt-5-miniの場合はResponses APIのレスポンス構造、それ以外はChat Completions APIの構造
+    if ($isGpt5Mini) {
+        // Responses APIの場合、outputの中からtype="message"を探す
+        if (isset($data['output']) && is_array($data['output'])) {
+            foreach ($data['output'] as $item) {
+                if (isset($item['type']) && $item['type'] === 'message' &&
+                    isset($item['content'][0]['text'])) {
+                    return $item['content'][0]['text'];
+                }
+            }
+        }
     } else {
-        error_log("OpenAI API error: " . json_encode($data));
-        return "APIからの応答を解析できませんでした。詳細はログを確認してください。";
+        if (isset($data['choices'][0]['message']['content'])) {
+            return $data['choices'][0]['message']['content'];
+        }
     }
+
+    // エラー処理
+    error_log("OpenAI API error: " . json_encode($data));
+    $logMessage = date('Y-m-d H:i:s') . " [analyzeArticleIssues ERROR] Full Response: " . $response . "\n";
+    @file_put_contents($logFile, $logMessage, FILE_APPEND);
+    return "APIからの応答を解析できませんでした。詳細はログを確認してください。";
 }
 
 /**
@@ -181,25 +232,50 @@ JSONのみを出力し、他の説明は禁止です。
     $userPrompt .= "【元の本文】\n" . $plainContent . "\n\n";
     $userPrompt .= "【分析された問題点】\n" . $issues . "\n\n上記の分析された問題点を必ずすべて反映し、タイトル・メタディスクリプション・本文すべてに改善点が明確にわかるように記事をリライトしてください。";
     
-    // APIリクエストデータ
-    $requestData = [
-        'model' => $model,
-        'messages' => [
-            [
-                'role' => 'system',
-                'content' => $systemPrompt
+    // gpt-5-mini用のResponses APIとその他のモデル用のChat Completions APIを判別
+    $isGpt5Mini = (strpos($model, 'gpt-5') === 0);
+
+    if ($isGpt5Mini) {
+        // Responses API用のリクエストデータ（gpt-5-mini）
+        $combinedPrompt = $systemPrompt . "\n\n" . $userPrompt;
+        $requestData = [
+            'model' => $model,
+            'input' => [
+                [
+                    'role' => 'user',
+                    'content' => [
+                        [
+                            'type' => 'input_text',
+                            'text' => $combinedPrompt
+                        ]
+                    ]
+                ]
             ],
-            [
-                'role' => 'user',
-                'content' => $userPrompt
-            ]
-        ],
-        'temperature' => 0.7,
-        'max_tokens' => 4000
-    ];
-    
+            'max_output_tokens' => 4000
+        ];
+        $endpoint = 'https://api.openai.com/v1/responses';
+    } else {
+        // Chat Completions API用のリクエストデータ（gpt-4o等）
+        $requestData = [
+            'model' => $model,
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => $systemPrompt
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $userPrompt
+                ]
+            ],
+            'temperature' => 0.7,
+            'max_tokens' => 4000
+        ];
+        $endpoint = 'https://api.openai.com/v1/chat/completions';
+    }
+
     // APIリクエスト
-    $ch = curl_init('https://api.openai.com/v1/chat/completions');
+    $ch = curl_init($endpoint);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($requestData));
@@ -209,7 +285,17 @@ JSONのみを出力し、他の説明は禁止です。
     ]);
     
     $response = curl_exec($ch);
-    
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+    // デバッグ用：レスポンスをログファイルに記録
+    $logDir = __DIR__ . '/../../logs';
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+    $logFile = $logDir . '/openai_' . date('Ymd') . '.log';
+    $logMessage = date('Y-m-d H:i:s') . " [improveArticle] HTTP Code: $httpCode, Model: $model, Response: " . substr($response, 0, 500) . "\n";
+    @file_put_contents($logFile, $logMessage, FILE_APPEND);
+
     if (curl_errno($ch)) {
         error_log('Curl error: ' . curl_error($ch));
         curl_close($ch);
@@ -219,32 +305,52 @@ JSONのみを出力し、他の説明は禁止です。
             'content' => "<p>APIエラーが発生しました。詳細はログを確認してください。</p>"
         ];
     }
-    
+
     curl_close($ch);
-    
+
     // レスポンスをJSONからデコード
     $data = json_decode($response, true);
-    
-    if (isset($data['choices'][0]['message']['content'])) {
-        $content = $data['choices'][0]['message']['content'];
-        
+
+    $content = null;
+
+    // gpt-5-miniの場合はResponses APIのレスポンス構造、それ以外はChat Completions APIの構造
+    if ($isGpt5Mini) {
+        // Responses APIの場合、outputの中からtype="message"を探す
+        if (isset($data['output']) && is_array($data['output'])) {
+            foreach ($data['output'] as $item) {
+                if (isset($item['type']) && $item['type'] === 'message' &&
+                    isset($item['content'][0]['text'])) {
+                    $content = $item['content'][0]['text'];
+                    break;
+                }
+            }
+        }
+    } else {
+        if (isset($data['choices'][0]['message']['content'])) {
+            $content = $data['choices'][0]['message']['content'];
+        }
+    }
+
+    if ($content) {
         // JSONを抽出
         if (preg_match('/```json\s*(.*?)\s*```/s', $content, $matches)) {
             $jsonStr = $matches[1];
         } else {
             $jsonStr = $content;
         }
-        
+
         // JSONをデコード
         $improvedData = json_decode($jsonStr, true);
-        
-        if (is_array($improvedData) && 
-            isset($improvedData['title']) && 
-            isset($improvedData['description']) && 
+
+        if (is_array($improvedData) &&
+            isset($improvedData['title']) &&
+            isset($improvedData['description']) &&
             isset($improvedData['content'])) {
             return $improvedData;
         } else {
             error_log("Failed to parse JSON from OpenAI response: " . $content);
+            $logMessage = date('Y-m-d H:i:s') . " [improveArticle JSON Parse Error] Content: " . $content . "\n";
+            @file_put_contents($logFile, $logMessage, FILE_APPEND);
             return [
                 'title' => $title,
                 'description' => $description,
@@ -253,6 +359,8 @@ JSONのみを出力し、他の説明は禁止です。
         }
     } else {
         error_log("OpenAI API error: " . json_encode($data));
+        $logMessage = date('Y-m-d H:i:s') . " [improveArticle ERROR] Full Response: " . $response . "\n";
+        @file_put_contents($logFile, $logMessage, FILE_APPEND);
         return [
             'title' => $title,
             'description' => $description,
